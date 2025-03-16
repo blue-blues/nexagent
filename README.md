@@ -93,6 +93,24 @@ headless = false  # Set to true for production use
 timeout = 30000   # Default timeout in milliseconds
 ```
 
+
+## Examples
+Given Prompt to Nexagent
+```
+Identify the top-performing small- and mid-cap stocks with strong growth potential. Consider key financial metrics such as revenue growth, earnings per share (EPS), price-to-earnings (P/E) ratio, return on equity (ROE), and debt-to-equity ratio. Analyze technical indicators like moving averages, relative strength index (RSI), and trading volume trends. Additionally, assess industry trends, recent news, and market sentiment to refine stock selection. Provide a ranked list of the top 10 stocks with a brief justification for each pick and create list and save to local
+```
+Given Results by Nexagent
+```
+Top 4 Stocks Ranked:
+
+1. ACMR (ACM Research, Inc.): This small-cap stock shows promise due to its strong revenue growth and position in the semiconductor industry.
+2. ACLS (Axcelis Technologies, Inc.): This small-cap stock is also attractive due to its strong performance in the semiconductor equipment sector.
+3. TDY (Teledyne Technologies Incorporated): This mid-cap stock is a stable company with enabling technologies for industrial growth markets.
+4. BLL (Ball Corporation): This mid-cap stock is a well-established company with sustainable aluminum packaging solutions.
+
+Disclaimer: This analysis is based on limited information and should not be considered financial advice. A more thorough analysis would be required to make informed investment decisions.
+```
+
 ## 🔍 Usage Examples
 
 ### Basic Data Extraction
