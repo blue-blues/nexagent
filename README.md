@@ -1,10 +1,10 @@
-# Nexagent: Advanced Intelligent Web Scraping Agent
+# Nexagent: Advanced Intelligent Agent
 
 <div align="center">
   <img src="https://github.com/blue-blues/nexagent/raw/main/assets/nexagent-logo.png" alt="Nexagent Logo" width="250"/>
   <br>
   <br>
-  <strong>A versatile AI agent with state-of-the-art web scraping capabilities</strong>
+  <strong>A versatile AI agent with state-of-the-art capabilities</strong>
   <br>
   <br>
 </div>
@@ -15,36 +15,35 @@
 
 ## 🚀 Overview
 
-Nexagent is a powerful, intelligent agent that specializes in comprehensive web extraction and data processing. Built on a solid agent framework, Nexagent stands out for its exceptional ability to:
+Nexagent is a powerful, intelligent agent that specializes in comprehensive data extraction and processing. Built on a solid agent framework, Nexagent stands out for its exceptional ability to:
 
-- **Extract complete web content** from even the most complex websites
-- **Dynamically adapt** to different site structures and anti-scraping measures
+- **Extract complete content** from even the most complex sources
+- **Dynamically adapt** to different structures and anti-extraction measures
 - **Process information** intelligently with flexible step planning
-- **Handle pagination and infinite scroll** sites automatically
-- **Navigate complex web applications** with intelligent fallback mechanisms
+- **Handle complex data structures** automatically
+- **Navigate complex applications** with intelligent fallback mechanisms
 
 ## 🌟 Key Features
 
-### Advanced Web Scraping
+### Advanced Data Extraction
 
-- **Comprehensive extraction modes**: From basic text to full structured page content
-- **Stealth browsing**: Undetectable browsing with advanced anti-detection bypasses
-- **Infinite scroll handling**: Automatically detects and loads dynamically loaded content
-- **Pagination detection**: Identifies and follows multi-page content
-- **Content structure preservation**: Maintains original document hierarchy and relationships
+- **Comprehensive extraction modes**: From basic text to full structured content
+- **Stealth operation**: Undetectable operation with advanced anti-detection bypasses
+- **Complex data handling**: Automatically detects and processes dynamically loaded content
+- **Structure preservation**: Maintains original document hierarchy and relationships
 
 ### Intelligent Processing
 
 - **Dynamic step planning**: Automatically calculates appropriate step limits based on task complexity
 - **Multi-level fallback**: Gracefully handles failures with multiple retry strategies
-- **Self-healing navigation**: Adapts to site changes and connection issues automatically
+- **Self-healing navigation**: Adapts to changes and connection issues automatically
 - **Content-focused extraction**: Intelligently identifies and prioritizes main content
 
 ### Flexible Architecture
 
 - **Modular tool system**: Easily extensible with new capabilities
-- **Multiple extraction strategies**: Extract exactly what you need, from text to full DOM
-- **Configurable behavior**: Fine-tune scraping behavior to suit different sites
+- **Multiple extraction strategies**: Extract exactly what you need, from text to full data structures
+- **Configurable behavior**: Fine-tune operation behavior to suit different sources
 
 ## 🛠️ Installation
 
@@ -90,7 +89,7 @@ timeout = 30000   # Default timeout in milliseconds
 
 ## 🔍 Usage Examples
 
-### Basic Web Scraping
+### Basic Data Extraction
 
 ```python
 from nexagent import Nexagent
@@ -98,7 +97,7 @@ from nexagent import Nexagent
 async def main():
     agent = Nexagent()
     
-    # Launch a basic scraping task
+    # Launch a basic extraction task
     result = await agent.run("Extract all product information from https://example.com/products")
     print(result)
     
@@ -109,12 +108,12 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-### Comprehensive Web Extraction
+### Comprehensive Data Extraction
 
 ```python
 from nexagent.tool.enhanced_browser_tool import EnhancedBrowserTool
 
-async def extract_complete_website():
+async def extract_complete_source():
     browser = EnhancedBrowserTool()
     
     try:
@@ -143,28 +142,28 @@ async def extract_complete_website():
 
 if __name__ == "__main__":
     import asyncio
-    asyncio.run(extract_complete_website())
+    asyncio.run(extract_complete_source())
 ```
 
 ## 📊 Advanced Usage
 
-### Handling Infinite Scroll Pages
+### Handling Complex Data Structures
 
-Nexagent automatically detects and handles infinite scroll pages:
+Nexagent automatically detects and handles complex data structures:
 
 ```python
 result = await browser.execute(
     action="navigate_and_extract",
-    url="https://example.com/infinite-scroll-gallery",
+    url="https://example.com/complex-data-gallery",
     extract_type="comprehensive",
-    timeout=60000  # Allow more time for scrolling and loading
+    timeout=60000  # Allow more time for processing and loading
 )
 ```
 
-### Following Pagination
+### Following Complex Structures
 
 ```python
-async def extract_all_pages(base_url):
+async def extract_all_structures(base_url):
     browser = EnhancedBrowserTool()
     all_results = []
     
@@ -173,7 +172,7 @@ async def extract_all_pages(base_url):
         page = 1
         
         while True:
-            print(f"Processing page {page}: {current_url}")
+            print(f"Processing structure {page}: {current_url}")
             
             result = await browser.execute(
                 action="navigate_and_extract",
@@ -181,15 +180,15 @@ async def extract_all_pages(base_url):
                 extract_type="comprehensive"
             )
             
-            # Process this page's results
+            # Process this structure's results
             content = json.loads(result.output.split("\n\n", 1)[1])
             all_results.append(content)
             
-            # Check for pagination
-            if "pagination" in content and content["pagination"].get("paginationLinks"):
+            # Check for complex structures
+            if "complex_structure" in content and content["complex_structure"].get("structureLinks"):
                 # Find the "next" link
                 next_link = None
-                for link in content["pagination"]["paginationLinks"]:
+                for link in content["complex_structure"]["structureLinks"]:
                     if link.get("isNext"):
                         next_link = link["href"]
                         break
@@ -198,10 +197,10 @@ async def extract_all_pages(base_url):
                     current_url = next_link
                     page += 1
                 else:
-                    print("No more pages found.")
+                    print("No more structures found.")
                     break
             else:
-                print("No pagination detected.")
+                print("No complex structures detected.")
                 break
     
     finally:
@@ -214,17 +213,17 @@ async def extract_all_pages(base_url):
 
 ### EnhancedBrowserTool
 
-The core web scraping component with the following main actions:
+The core data extraction component with the following main actions:
 
 | Action | Description |
 |--------|-------------|
 | `navigate` | Navigate to a URL |
 | `navigate_and_extract` | Navigate and extract content in one step |
-| `stealth_mode` | Enable/disable stealth browsing |
+| `stealth_mode` | Enable/disable stealth operation |
 | `random_delay` | Set random delays between actions |
-| `extract_structured` | Extract structured data from the page |
-| `get_text` | Get text content from the current page |
-| `get_html` | Get HTML content from the current page |
+| `extract_structured` | Extract structured data from the source |
+| `get_text` | Get text content from the current source |
+| `get_html` | Get HTML content from the current source |
 
 ### Nexagent
 
@@ -232,7 +231,7 @@ The high-level agent that manages the entire extraction process:
 
 - Dynamically calculates appropriate step limits based on task complexity
 - Provides multi-level fallbacks for robust operation
-- Manages browser sessions and resources automatically
+- Manages sessions and resources automatically
 
 ## 🤝 Contributing
 
@@ -251,4 +250,4 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## 🙏 Acknowledgements
 
 - Special thanks to the [OpenManus](https://github.com/mannaandpoem/OpenManus) team for inspiration
-- Built with [browser-use](https://github.com/browser-use/browser-use) for foundational browser automation
+- Built with [browser-use](https://github.com/browser-use/browser-use) for foundational automation
