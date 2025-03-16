@@ -97,7 +97,11 @@ timeout = 30000   # Default timeout in milliseconds
 ## Examples
 Given Prompt to Nexagent
 ```
-Identify the top-performing small- and mid-cap stocks with strong growth potential. Consider key financial metrics such as revenue growth, earnings per share (EPS), price-to-earnings (P/E) ratio, return on equity (ROE), and debt-to-equity ratio. Analyze technical indicators like moving averages, relative strength index (RSI), and trading volume trends. Additionally, assess industry trends, recent news, and market sentiment to refine stock selection. Provide a ranked list of the top 10 stocks with a brief justification for each pick and create list and save to local
+Identify the top-performing small- and mid-cap stocks with strong growth potential. 
+Consider key financial metrics such as revenue growth, earnings per share (EPS), price-to-earnings (P/E) ratio, return on equity (ROE), and 
+debt-to-equity ratio. Analyze technical indicators like moving averages, relative strength index (RSI), and trading volume trends. 
+Additionally, assess industry trends, recent news, and market sentiment to refine stock selection. Provide a ranked list of the top 10 stocks 
+with a brief justification for each pick and create list and save to local
 ```
 Given Results by Nexagent
 ```
@@ -110,7 +114,6 @@ Top 4 Stocks Ranked:
 
 Disclaimer: This analysis is based on limited information and should not be considered financial advice. A more thorough analysis would be required to make informed investment decisions.
 ```
-
 ## 🔍 Usage Examples
 
 ### Basic Data Extraction
