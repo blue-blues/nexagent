@@ -1,85 +1,78 @@
-# Nexagent: Advanced Intelligent Agent
+Nexagent: Next‑Gen Intelligent Data Extraction Agent
+<div align="center"> <img src="https://github.com/blue-blues/nexagent/raw/main/assets/nexagent-logo.png" alt="Nexagent Logo" width="250"/> <br><br> <strong>Your versatile AI agent for dynamic data extraction and intelligent processing</strong> <br><br> </div>
 
-<div align="center">
-  <img src="https://github.com/blue-blues/nexagent/raw/main/assets/nexagent-logo.png" alt="Nexagent Logo" width="250"/>
-  <br>
-  <br>
-  <strong>A versatile AI agent with state-of-the-art capabilities</strong>
-  <br>
-  <br>
-</div>
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-![Python 3.9+](https://img.shields.io/badge/Python-3.9+-blue.svg)
-[![GitHub stars](https://img.shields.io/github/stars/blue-blues/nexagent?style=social)](https://github.com/blue-blues/nexagent/stargazers)
+🚀 Overview
+Nexagent is a cutting‑edge intelligent agent built for comprehensive data extraction and processing. Leveraging advanced AI and asynchronous execution, Nexagent is designed to:
 
-## 🚀 Overview
+Extract full content even from dynamic and complex sources.
+Adapt dynamically to various data structures and anti‑extraction measures.
+Process and analyze data intelligently through multi‑step planning.
+Handle complex data hierarchies with robust fallback mechanisms.
+Integrate seamlessly with external APIs and local resources for enhanced functionality.
+🌟 Key Features
+Advanced Data Extraction
+Comprehensive extraction modes: Supports plain text, structured content, and dynamic page elements.
+Stealth operation: Incorporates advanced anti‑detection techniques and randomized delays.
+Adaptive parsing: Automatically detects, parses, and preserves document structure.
+Asynchronous execution: Utilizes modern async/await patterns for non‑blocking extraction.
+Intelligent Processing & Reasoning
+Dynamic step planning: Automatically adjusts execution steps based on task complexity.
+Multi‑level fallback: Implements retries, exponential backoff, and self‑healing strategies.
+Smarter reasoning: Integrates enhanced LLM integrations for improved tool selection and decision making.
+Context‑aware insights: Prioritizes main content with intelligent prioritization of extraction targets.
+Flexible & Modular Architecture
+Modular tool system: Easily extend with new extraction strategies and processing modules.
+Configurable behavior: Fine‑tune settings via a simple TOML configuration file.
+Robust dependency management: Automatically installs missing modules and verifies execution environments.
+Seamless API integration: Supports external APIs (e.g., Google Gemini, Gemma API) for data enrichment.
+🛠️ Installation
+Clone the repository:
 
-Nexagent is a powerful, intelligent agent that specializes in comprehensive data extraction and processing. Built on a solid agent framework, Nexagent stands out for its exceptional ability to:
-
-- **Extract complete content** from even the most complex sources
-- **Dynamically adapt** to different structures and anti-extraction measures
-- **Process information** intelligently with flexible step planning
-- **Handle complex data structures** automatically
-- **Navigate complex applications** with intelligent fallback mechanisms
-
-## 🌟 Key Features
-
-### Advanced Data Extraction
-
-- **Comprehensive extraction modes**: From basic text to full structured content
-- **Stealth operation**: Undetectable operation with advanced anti-detection bypasses
-- **Complex data handling**: Automatically detects and processes dynamically loaded content
-- **Structure preservation**: Maintains original document hierarchy and relationships
-
-### Intelligent Processing
-
-- **Dynamic step planning**: Automatically calculates appropriate step limits based on task complexity
-- **Multi-level fallback**: Gracefully handles failures with multiple retry strategies
-- **Self-healing navigation**: Adapts to changes and connection issues automatically
-- **Content-focused extraction**: Intelligently identifies and prioritizes main content
-
-### Flexible Architecture
-
-- **Modular tool system**: Easily extensible with new capabilities
-- **Multiple extraction strategies**: Extract exactly what you need, from text to full data structures
-- **Configurable behavior**: Fine-tune operation behavior to suit different sources
-
-## 🛠️ Installation
-
-```bash
-# Clone the repository
+bash
+Copy
+Edit
 git clone https://github.com/blue-blues/nexagent.git
 cd nexagent
+Create and activate a virtual environment (recommended):
 
-# Create a virtual environment (recommended)
+bash
+Copy
+Edit
 python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+# On Unix/macOS:
+source venv/bin/activate
+# On Windows:
+venv\Scripts\activate
+Install dependencies:
 
-# Install dependencies
+bash
+Copy
+Edit
 pip install -r requirements.txt
+Configure the agent:
 
-# Run the python file
-python main.py
-
-> Enter promt <
-```
-
-
-## ⚙️ Configuration
-
-Nexagent requires minimal configuration to get started:
-
-1. Create a `config.toml` file in the `config` directory:
-
-```bash
+Copy the example config:
+bash
+Copy
+Edit
 cp config/config.example.toml config/config.toml
-```
+Edit config/config.toml to add your API keys and adjust settings as needed.
+Run Nexagent:
 
-2. Edit the configuration file to add any required API keys:
+bash
+Copy
+Edit
+python main.py
+When prompted, enter your extraction or analysis prompt.
 
-```toml
-# LLM model configuration (if using LLM capabilities)
+⚙️ Configuration
+Nexagent uses a TOML configuration file located at config/config.toml. Key configuration parameters include:
+
+toml
+Copy
+Edit
+# LLM Model Settings
 [llm]
 model = "gpt-4o"
 base_url = "https://api.openai.com/v1"
@@ -87,194 +80,138 @@ api_key = "sk-..."  # Your API key
 max_tokens = 4096
 temperature = 0.0
 
-# Browser configuration
+# Browser Extraction Settings
 [browser]
-headless = false  # Set to true for production use
-timeout = 30000   # Default timeout in milliseconds
-```
+headless = true     # Use headless mode in production
+timeout = 60000     # Adjust timeout (ms) for slow-loading sites
+random_delay_min = 800
+random_delay_max = 2500
 
-
-## Examples
-Given Prompt to Nexagent
-```
-Identify the top-performing small- and mid-cap stocks with strong growth potential. 
-Consider key financial metrics such as revenue growth, earnings per share (EPS), price-to-earnings (P/E) ratio, return on equity (ROE), and 
-debt-to-equity ratio. Analyze technical indicators like moving averages, relative strength index (RSI), and trading volume trends. 
-Additionally, assess industry trends, recent news, and market sentiment to refine stock selection. Provide a ranked list of the top 10 stocks 
-with a brief justification for each pick and create list and save to local
-```
-Given Results by Nexagent
-```
-Top 4 Stocks Ranked:
-
-1. ACMR (ACM Research, Inc.): This small-cap stock shows promise due to its strong revenue growth and position in the semiconductor industry.
-2. ACLS (Axcelis Technologies, Inc.): This small-cap stock is also attractive due to its strong performance in the semiconductor equipment sector.
-3. TDY (Teledyne Technologies Incorporated): This mid-cap stock is a stable company with enabling technologies for industrial growth markets.
-4. BLL (Ball Corporation): This mid-cap stock is a well-established company with sustainable aluminum packaging solutions.
-
-Disclaimer: This analysis is based on limited information and should not be considered financial advice. A more thorough analysis would be required to make informed investment decisions.
-```
-## 🔍 Usage Examples
-
-### Basic Data Extraction
-
-```python
+# Execution and Retry Settings
+[execution]
+default_timeout = 10  # Timeout for Python code execution (seconds)
+max_retries = 3       # Max retries for API calls
+🔍 Usage Examples
+Basic Data Extraction
+python
+Copy
+Edit
+import asyncio
 from nexagent import Nexagent
 
 async def main():
     agent = Nexagent()
-    
-    # Launch a basic extraction task
-    result = await agent.run("Extract all product information from https://example.com/products")
-    print(result)
-    
-    await agent.close()
+    try:
+        # Extract product information from a website
+        result = await agent.run("Extract all product information from https://example.com/products")
+        print(result)
+    finally:
+        await agent.close()
 
 if __name__ == "__main__":
-    import asyncio
     asyncio.run(main())
-```
-
-### Comprehensive Data Extraction
-
-```python
+Advanced Comprehensive Extraction
+python
+Copy
+Edit
+import asyncio
 from nexagent.tool.enhanced_browser_tool import EnhancedBrowserTool
 
-async def extract_complete_source():
+async def extract_complete_site():
     browser = EnhancedBrowserTool()
-    
     try:
-        # Enable stealth mode to avoid detection
+        # Enable stealth mode and random delays to avoid detection
         await browser.execute(action="stealth_mode", enable=True)
-        
-        # Use random delays to appear more human-like
         await browser.execute(action="random_delay", min_delay=800, max_delay=2500)
         
-        # Extract comprehensive data
+        # Extract comprehensive content from a complex website
         result = await browser.execute(
             action="navigate_and_extract",
             url="https://example.com/complex-site",
-            extract_type="comprehensive"  # Use the most thorough extraction mode
+            extract_type="comprehensive"
         )
         
-        # Process and save the results
-        import json
+        # Save the results locally
         with open("extraction_results.json", "w") as f:
-            content = result.output.split("\n\n", 1)[1]  # Skip the success message
+            content = result.output.split("\n\n", 1)[1]  # Remove any header message
             f.write(content)
-            print("Extraction complete. Results saved.")
-            
+        print("Extraction complete. Results saved.")
     finally:
         await browser.close()
 
 if __name__ == "__main__":
-    import asyncio
-    asyncio.run(extract_complete_source())
-```
+    asyncio.run(extract_complete_site())
+Handling Dynamic Workflows
+python
+Copy
+Edit
+import asyncio
+import json
+from nexagent.tool.enhanced_browser_tool import EnhancedBrowserTool
 
-## 📊 Advanced Usage
-
-### Handling Complex Data Structures
-
-Nexagent automatically detects and handles complex data structures:
-
-```python
-result = await browser.execute(
-    action="navigate_and_extract",
-    url="https://example.com/complex-data-gallery",
-    extract_type="comprehensive",
-    timeout=60000  # Allow more time for processing and loading
-)
-```
-
-### Following Complex Structures
-
-```python
-async def extract_all_structures(base_url):
+async def extract_complex_structures(base_url):
     browser = EnhancedBrowserTool()
     all_results = []
-    
     try:
         current_url = base_url
         page = 1
         
         while True:
-            print(f"Processing structure {page}: {current_url}")
-            
+            print(f"Processing page {page}: {current_url}")
             result = await browser.execute(
                 action="navigate_and_extract",
                 url=current_url,
-                extract_type="comprehensive"
+                extract_type="comprehensive",
+                timeout=60000  # Extended timeout for complex pages
             )
-            
-            # Process this structure's results
             content = json.loads(result.output.split("\n\n", 1)[1])
             all_results.append(content)
             
-            # Check for complex structures
-            if "complex_structure" in content and content["complex_structure"].get("structureLinks"):
-                # Find the "next" link
-                next_link = None
-                for link in content["complex_structure"]["structureLinks"]:
-                    if link.get("isNext"):
-                        next_link = link["href"]
-                        break
-                
-                if next_link:
-                    current_url = next_link
-                    page += 1
-                else:
-                    print("No more structures found.")
+            # Determine next page link
+            next_link = None
+            for link in content.get("structureLinks", []):
+                if link.get("isNext"):
+                    next_link = link["href"]
                     break
+            if next_link:
+                current_url = next_link
+                page += 1
             else:
-                print("No complex structures detected.")
+                print("No further pages found.")
                 break
-    
     finally:
         await browser.close()
     
     return all_results
-```
 
-## 🧩 Component Reference
+if __name__ == "__main__":
+    results = asyncio.run(extract_complex_structures("https://example.com/complex-data-gallery"))
+    print(results)
+📊 Advanced Features
+Auto‑Installation of Missing Modules
+Nexagent now includes an auto‑installer that scans for required Python modules before executing code. If a module is missing, it automatically installs it via pip, ensuring smoother execution.
 
-### EnhancedBrowserTool
+Enhanced Reasoning & Fallback Mechanisms
+Smarter LLM Integration:
+Nexagent now uses improved LLM logic to generate meaningful “thoughts” and decides which tools to execute based on context.
+Adaptive API Delays:
+Implements configurable delays and dynamic backoff to prevent rate limit issues.
+Loop Escape Strategies:
+Detects repetitive execution cycles and adjusts the workflow to ensure continuous progress.
+🤝 Contributing
+Contributions are welcome! To contribute:
 
-The core data extraction component with the following main actions:
+Fork the repository.
+Create a feature branch:
+bash
+Copy
+Edit
+git checkout -b feature/your-feature-name
+Commit your changes with clear messages.
+Push to your branch and open a Pull Request.
+📄 License
+This project is licensed under the MIT License – see the LICENSE file for details.
 
-| Action | Description |
-|--------|-------------|
-| `navigate` | Navigate to a URL |
-| `navigate_and_extract` | Navigate and extract content in one step |
-| `stealth_mode` | Enable/disable stealth operation |
-| `random_delay` | Set random delays between actions |
-| `extract_structured` | Extract structured data from the source |
-| `get_text` | Get text content from the current source |
-| `get_html` | Get HTML content from the current source |
-
-### Nexagent
-
-The high-level agent that manages the entire extraction process:
-
-- Dynamically calculates appropriate step limits based on task complexity
-- Provides multi-level fallbacks for robust operation
-- Manages sessions and resources automatically
-
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## 📄 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## 🙏 Acknowledgements
-
-- Special thanks to the [OpenManus](https://github.com/mannaandpoem/OpenManus) team for inspiration
-- Built with [browser-use](https://github.com/browser-use/browser-use) for foundational automation
+🙏 Acknowledgements
+Special thanks to the OpenManus team for inspiration.
+Built on the foundational principles of browser-use.
