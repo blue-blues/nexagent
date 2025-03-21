@@ -2,7 +2,9 @@ from typing import Dict, List, Union
 
 from app.agent.base import BaseAgent
 from app.flow.base import BaseFlow, FlowType
+from app.flow.parallel import ParallelFlow, ParallelWorkflowFlow
 from app.flow.planning import PlanningFlow
+from app.flow.self_improving import SelfImprovingParallelFlow, SelfImprovingParallelWorkflowFlow
 
 
 class FlowFactory:
@@ -16,6 +18,10 @@ class FlowFactory:
     ) -> BaseFlow:
         flows = {
             FlowType.PLANNING: PlanningFlow,
+            FlowType.PARALLEL: ParallelFlow,
+            FlowType.PARALLEL_WORKFLOW: ParallelWorkflowFlow,
+            "self_improving_parallel": SelfImprovingParallelFlow,
+            "self_improving_workflow": SelfImprovingParallelWorkflowFlow,
         }
 
         flow_class = flows.get(flow_type)

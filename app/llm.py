@@ -1,6 +1,10 @@
 from typing import Dict, List, Optional, Union
+import asyncio
+import time
 
 import tiktoken
+import aiohttp
+import json
 from openai import (
     APIError,
     AsyncAzureOpenAI,
@@ -18,6 +22,7 @@ from tenacity import (
 
 from app.config import LLMSettings, config
 from app.exceptions import TokenLimitExceeded
+from app.google_llm import GoogleGenerativeAIClient
 from app.logger import logger  # Assuming a logger is set up in your app
 from app.schema import (
     ROLE_VALUES,
@@ -64,6 +69,11 @@ class LLM:
                 if hasattr(llm_config, "max_input_tokens")
                 else None
             )
+            
+            # Add API call delay configuration
+            self.api_call_delay = getattr(llm_config, "api_call_delay", 1.0)  # Default 1 second delay
+            self.last_api_call_time = 0.0  # Track the last API call time
+            self.backoff_factor = 1.0  # Initial backoff factor
 
             # Initialize tokenizer
             try:
@@ -77,6 +87,13 @@ class LLM:
                     base_url=self.base_url,
                     api_key=self.api_key,
                     api_version=self.api_version,
+                )
+            elif self.api_type == "google":
+                # For Google Gemini API, we'll use a custom client
+                self.client = GoogleGenerativeAIClient(
+                    api_key=self.api_key,
+                    base_url=self.base_url,
+                    model=self.model,
                 )
             else:
                 self.client = AsyncOpenAI(api_key=self.api_key, base_url=self.base_url)

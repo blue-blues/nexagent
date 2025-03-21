@@ -5,6 +5,8 @@ from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
+from app.logger import logger
+
 
 def get_project_root() -> Path:
     """Get the project root directory"""
@@ -25,8 +27,8 @@ class LLMSettings(BaseModel):
         description="Maximum input tokens to use across all requests (None for unlimited)",
     )
     temperature: float = Field(1.0, description="Sampling temperature")
-    api_type: str = Field(..., description="AzureOpenai or Openai")
-    api_version: str = Field(..., description="Azure Openai version if AzureOpenai")
+    api_type: str = Field("openai", description="API type: 'openai', 'azure', 'google', or 'ollama'")
+    api_version: str = Field("", description="API version if needed (e.g., for Azure OpenAI)")
 
 
 class ProxySettings(BaseModel):
@@ -98,17 +100,37 @@ class Config:
     def _get_config_path() -> Path:
         root = PROJECT_ROOT
         config_path = root / "config" / "config.toml"
+        # Check for absolute path first (for the specified path)
+        absolute_path = Path("D:/code/manus/OpenManus/nexagent/config/config.toml")
+        if absolute_path.exists():
+            logger.info(f"Loading configuration from absolute path: {absolute_path}")
+            return absolute_path
+        # Fall back to relative path
         if config_path.exists():
+            logger.info(f"Loading configuration from relative path: {config_path}")
             return config_path
         example_path = root / "config" / "config.example.toml"
         if example_path.exists():
+            logger.warning(f"Configuration file not found, using example config: {example_path}")
             return example_path
         raise FileNotFoundError("No configuration file found in config directory")
 
     def _load_config(self) -> dict:
-        config_path = self._get_config_path()
-        with config_path.open("rb") as f:
-            return tomllib.load(f)
+        try:
+            config_path = self._get_config_path()
+            with config_path.open("rb") as f:
+                config = tomllib.load(f)
+                logger.info("Configuration loaded successfully")
+                return config
+        except FileNotFoundError as e:
+            logger.error(f"Configuration file not found: {e}")
+            raise
+        except tomllib.TOMLDecodeError as e:
+            logger.error(f"Error parsing TOML configuration: {e}")
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error loading configuration: {e}")
+            raise
 
     def _load_initial_config(self):
         raw_config = self._load_config()
@@ -124,7 +146,7 @@ class Config:
             "max_tokens": base_llm.get("max_tokens", 4096),
             "max_input_tokens": base_llm.get("max_input_tokens"),
             "temperature": base_llm.get("temperature", 1.0),
-            "api_type": base_llm.get("api_type", ""),
+            "api_type": base_llm.get("api_type", "openai"),
             "api_version": base_llm.get("api_version", ""),
         }
 

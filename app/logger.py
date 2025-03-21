@@ -1,42 +1,28 @@
+import os
 import sys
 from datetime import datetime
+from pathlib import Path
 
-from loguru import logger as _logger
+from loguru import logger
+from app.constants import PROJECT_ROOT  # Import from constants instead of config
 
-from app.config import PROJECT_ROOT
+# Configure logs directory
+LOGS_DIR = PROJECT_ROOT / "logs"
+os.makedirs(LOGS_DIR, exist_ok=True)
 
+# Generate log filename with timestamp
+log_filename = datetime.now().strftime("%Y%m%d%H%M%S") + ".log"
+log_path = LOGS_DIR / log_filename
 
-_print_level = "INFO"
+# Configure logger
+logger.remove()  # Remove default handler
+logger.add(sys.stderr, level="INFO")  # Add stderr handler
+logger.add(
+    log_path,
+    level="DEBUG",
+    rotation="500 MB",
+    retention="10 days",
+    compression="zip",
+)
 
-
-def define_log_level(print_level="INFO", logfile_level="DEBUG", name: str = None):
-    """Adjust the log level to above level"""
-    global _print_level
-    _print_level = print_level
-
-    current_date = datetime.now()
-    formatted_date = current_date.strftime("%Y%m%d%H%M%S")
-    log_name = (
-        f"{name}_{formatted_date}" if name else formatted_date
-    )  # name a log with prefix name
-
-    _logger.remove()
-    _logger.add(sys.stderr, level=print_level)
-    _logger.add(PROJECT_ROOT / f"logs/{log_name}.log", level=logfile_level)
-    return _logger
-
-
-logger = define_log_level()
-
-
-if __name__ == "__main__":
-    logger.info("Starting application")
-    logger.debug("Debug message")
-    logger.warning("Warning message")
-    logger.error("Error message")
-    logger.critical("Critical message")
-
-    try:
-        raise ValueError("Test error")
-    except Exception as e:
-        logger.exception(f"An error occurred: {e}")
+__all__ = ["logger"]

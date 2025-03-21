@@ -361,3 +361,9 @@ class PlanningTool(BaseTool):
                 output += f"   Notes: {notes}\n"
 
         return output
+
+
+# Add the Planning class as a wrapper around PlanningTool
+class Planning(PlanningTool):
+    """Wrapper class for PlanningTool to maintain backward compatibility."""
+    pass

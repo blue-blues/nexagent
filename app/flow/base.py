@@ -9,6 +9,10 @@ from app.agent.base import BaseAgent
 
 class FlowType(str, Enum):
     PLANNING = "planning"
+    PARALLEL = "parallel"
+    PARALLEL_WORKFLOW = "parallel_workflow"
+    SELF_IMPROVING_PARALLEL = "self_improving_parallel"
+    SELF_IMPROVING_WORKFLOW = "self_improving_workflow"
 
 
 class BaseFlow(BaseModel, ABC):

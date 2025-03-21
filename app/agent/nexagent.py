@@ -1,4 +1,4 @@
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from datetime import datetime
 import asyncio
 import re
@@ -8,7 +8,8 @@ from pydantic import Field
 
 from app.agent.toolcall import ToolCallAgent
 from app.prompt.nexagent import NEXT_STEP_PROMPT, SYSTEM_PROMPT
-from app.tool import Terminate, ToolCollection
+from app.tool import ToolCollection
+from app.tool.persistent_terminate import PersistentTerminate
 from app.tool.enhanced_browser_tool import EnhancedBrowserTool
 from app.tool.file_saver import FileSaver
 from app.tool.python_execute import PythonExecute
@@ -48,12 +49,39 @@ class Nexagent(ToolCallAgent):
             EnhancedBrowserTool(),
             FileSaver(),
             TaskAnalytics(),
-            Terminate()
+            PersistentTerminate()
         )
     )
 
+    def _validate_required_inputs(self, prompt: str) -> Optional[str]:
+        """Validate if all required inputs are present in the prompt.
+
+        Args:
+            prompt: The user's input prompt
+
+        Returns:
+            str: Error message if validation fails, None if validation passes
+        """
+        # Check for keywords that indicate required inputs
+        required_input_indicators = [
+            "add to cart", "order", "buy", "purchase", "select",
+            "choose", "pick", "get", "find", "search for"
+        ]
+
+        if any(indicator in prompt.lower() for indicator in required_input_indicators):
+            # Look for specific items or quantities
+            if not any(char.isdigit() or item in prompt.lower() for char in prompt for item in ["item", "product", "list"]):
+                return "Please provide specific items or quantities needed for this task."
+        
+        return None
+
     async def run(self, prompt: str) -> str:
         """Run the agent with the given prompt and track task history."""
+        # Validate required inputs first
+        error_message = self._validate_required_inputs(prompt)
+        if error_message:
+            return error_message
+
         start_time = datetime.now()
 
         # Dynamically set max_steps based on task complexity
