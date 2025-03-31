@@ -1,7 +1,8 @@
 import asyncio
 import sys
-import time
 
+from app.flow.base import FlowType
+from app.flow.flow_factory import FlowFactory
 from app.flow.integrated_flow import IntegratedFlow
 from app.logger import logger
 from app.session import session_manager
@@ -16,7 +17,7 @@ async def main():
     automatically routes queries to the appropriate specialized agent based on
     content analysis.
     """
-    print("\n=== Integrated AI Assistant System ===\n")
+    print("\n=== Integrated AI Assistant Flow System ===\n")
     print("This system combines:")
     print("1. General-purpose AI Assistant - for everyday tasks and queries")
     print("2. Software Development AI Assistant - for coding and technical tasks")
@@ -26,7 +27,7 @@ async def main():
     flow = IntegratedFlow()
     session = session_manager.create_session()
     
-    print("\nIntegrated AI Assistant initialized. Type 'exit' to quit.")
+    print("\nIntegrated AI Assistant Flow initialized. Type 'exit' to quit.")
     print("Type 'stats' to see routing statistics.")
     
     try:
@@ -99,7 +100,13 @@ async def main():
     except KeyboardInterrupt:
         logger.warning("Operation interrupted.")
         session.mark_terminated()
+    except Exception as e:
+        logger.error(f"Error in main loop: {str(e)}")
+        session.mark_terminated()
 
 
 if __name__ == "__main__":
+    # Add missing import
+    import time
+    
     asyncio.run(main())

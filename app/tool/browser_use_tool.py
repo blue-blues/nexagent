@@ -13,7 +13,7 @@ from app.config import config
 from app.tool.base import BaseTool, ToolResult
 
 
-MAX_LENGTH = 2000
+MAX_LENGTH = 20000
 
 _BROWSER_DESCRIPTION = """
 Interact with a web browser to perform various actions such as navigation, element interaction,

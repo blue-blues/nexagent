@@ -6,6 +6,7 @@ from app.tool.enhanced_browser_tool import EnhancedBrowserTool
 from app.tool.enhanced_terminal import EnhancedTerminal
 from app.tool.file_saver import FileSaver
 from app.tool.financial_data_extractor import FinancialDataExtractor
+from app.tool.mcp_server import MCPServerTool
 from app.tool.planning import PlanningTool
 from app.tool.python_execute import PythonExecute
 from app.tool.run import run
@@ -29,6 +30,7 @@ __all__ = [
     "EnhancedTerminal",
     "FileSaver",
     "FinancialDataExtractor",
+    "MCPServerTool",
     "PlanningTool",
     "PythonExecute",
     "Run",

@@ -1,4 +1,5 @@
 from collections import defaultdict
+import os
 from pathlib import Path
 from typing import Literal, get_args
 
@@ -23,6 +24,7 @@ TRUNCATED_MESSAGE: str = "<response clipped><NOTE>To save on context only part o
 
 _STR_REPLACE_EDITOR_DESCRIPTION = """Custom editing tool for viewing, creating and editing files
 * State is persistent across command calls and discussions with the user
+* Conversation memory tracks all interactions with files for improved context awareness
 * If `path` is a file, `view` displays the result of applying `cat -n`. If `path` is a directory, `view` lists non-hidden files and directories up to 2 levels deep
 * The `create` command cannot be used if the specified `path` already exists as a file
 * If a `command` generates a long output, it will be truncated and marked with `<response clipped>`
@@ -87,6 +89,7 @@ class StrReplaceEditor(BaseTool):
     }
 
     _file_history: list = defaultdict(list)
+    _conversation_memory: dict = defaultdict(list)
 
     async def execute(
         self,
@@ -136,12 +139,19 @@ class StrReplaceEditor(BaseTool):
         """
         Check that the path/command combination is valid.
         """
-        # Check if its an absolute path
-        if not path.is_absolute():
-            suggested_path = Path("") / path
-            raise ToolError(
-                f"The path {path} is not an absolute path, it should start with `/`. Maybe you meant {suggested_path}?"
-            )
+        # Check if its an absolute path using os.path.isabs for better cross-platform compatibility
+        if not os.path.isabs(str(path)):
+            # Convert relative path to absolute using current working directory
+            suggested_path = Path(os.getcwd()) / path
+            # Provide OS-specific guidance in the error message
+            if os.name == 'nt':  # Windows
+                raise ToolError(
+                    f"The path {path} is not an absolute path. On Windows, absolute paths should include a drive letter (e.g., C:\\path\\to\\file). Maybe you meant {suggested_path}?"
+                )
+            else:  # Unix/Linux
+                raise ToolError(
+                    f"The path {path} is not an absolute path, it should start with `/`. Maybe you meant {suggested_path}?"
+                )
         # Check if path exists
         if not path.exists() and command != "create":
             raise ToolError(
@@ -165,15 +175,27 @@ class StrReplaceEditor(BaseTool):
                 raise ToolError(
                     "The `view_range` parameter is not allowed when `path` points to a directory."
                 )
-
-            _, stdout, stderr = await run(
-                rf"find {path} -maxdepth 2 -not -path '*/\.*'"
-            )
-            if not stderr:
-                stdout = f"Here's the files and directories up to 2 levels deep in {path}, excluding hidden items:\n{stdout}\n"
-            return CLIResult(output=stdout, error=stderr)
-
-        file_content = self.read_file(path)
+            
+            # Use a more efficient approach for directory listing with timeout handling
+            try:
+                if os.name == 'nt':  # Windows
+                    # Use dir command on Windows with a 30-second timeout
+                    _, stdout, stderr = await run(
+                        rf"dir /B /S \"{path}\" | findstr /V /B /C:\".\\\"")
+                else:  # Unix/Linux
+                    # Use find command on Unix with a 30-second timeout
+                    _, stdout, stderr = await run(
+                        f"find \"{path}\" -type f -not -path \"*/\\.*\" | sort")
+                
+                return CLIResult(output=maybe_truncate(stdout))
+            except Exception as e:
+                raise ToolError(f"Failed to list directory {path}: {str(e)}")
+        
+        # If it's a file, read its content
+        try:
+            file_content = self.read_file(path)
+        except Exception as e:
+            raise ToolError(f"Failed to read file {path}: {str(e)}")
         init_line = 1
         if view_range:
             if len(view_range) != 2 or not all(isinstance(i, int) for i in view_range):
@@ -340,3 +362,57 @@ class StrReplaceEditor(BaseTool):
             + file_content
             + "\n"
         )
+        
+    def get_conversation_memory(self, path: Path, limit: int = 10):
+        """Retrieve conversation memory for a specific path.
+        
+        Args:
+            path: The path to retrieve conversation memory for
+            limit: Maximum number of entries to return (most recent first)
+            
+        Returns:
+            A list of conversation memory entries
+        """
+        if path not in self._conversation_memory:
+            return []
+        
+        # Return the most recent entries first, limited by the limit parameter
+        return list(reversed(self._conversation_memory[path][-limit:]))
+    
+    def clear_conversation_memory(self, path: Path = None):
+        """Clear conversation memory.
+        
+        Args:
+            path: The path to clear conversation memory for. If None, clear all conversation memory.
+        """
+        if path is None:
+            self._conversation_memory.clear()
+        elif path in self._conversation_memory:
+            del self._conversation_memory[path]
+            
+    def get_conversation_summary(self, path: Path = None):
+        """Generate a summary of conversation memory.
+        
+        Args:
+            path: The path to generate a summary for. If None, generate a summary for all paths.
+            
+        Returns:
+            A dictionary with summary information
+        """
+        summary = {}
+        
+        if path is not None:
+            if path in self._conversation_memory:
+                entries = self._conversation_memory[path]
+                summary[str(path)] = {
+                    "total_interactions": len(entries),
+                    "commands": {cmd: sum(1 for e in entries if e["command"] == cmd) for cmd in get_args(Command)},
+                }
+        else:
+            for path, entries in self._conversation_memory.items():
+                summary[str(path)] = {
+                    "total_interactions": len(entries),
+                    "commands": {cmd: sum(1 for e in entries if e["command"] == cmd) for cmd in get_args(Command)},
+                }
+                
+        return summary

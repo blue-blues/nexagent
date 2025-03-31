@@ -15,13 +15,21 @@
 
 ## 🚀 Overview
 
-Nexagent is a powerful, intelligent agent that specializes in comprehensive data extraction and processing. Built on a solid agent framework, Nexagent stands out for its exceptional ability to:
+Nexagent is a powerful, intelligent agent framework that offers multiple specialized assistants. Built on a solid agent architecture, Nexagent stands out for its exceptional abilities:
 
+### General-Purpose Assistant
 - **Extract complete content** from even the most complex sources
 - **Dynamically adapt** to different structures and anti-extraction measures
 - **Process information** intelligently with flexible step planning
 - **Handle complex data structures** automatically
 - **Navigate complex applications** with intelligent fallback mechanisms
+
+### Software Development Assistant
+- **Generate high-quality code** across multiple programming languages
+- **Debug and optimize** existing codebases automatically
+- **Design software architecture** with best practices and patterns
+- **Integrate APIs** and external services seamlessly
+- **Create automated tests** and ensure code quality
 
 ## 🌟 Key Features
 

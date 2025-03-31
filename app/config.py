@@ -27,6 +27,14 @@ class LLMSettings(BaseModel):
         description="Maximum input tokens to use across all requests (None for unlimited)",
     )
     temperature: float = Field(1.0, description="Sampling temperature")
+    allowed_domains: List[str] = Field(
+        default_factory=list,
+        description="Allowed domains for ethical content collection"
+    )
+    allowed_content_types: List[str] = Field(
+        default_factory=lambda: ["text/html", "application/pdf"],
+        description="Permitted content types for data processing"
+    )
     api_type: str = Field("openai", description="API type: 'openai', 'azure', 'google', or 'ollama'")
     api_version: str = Field("", description="API version if needed (e.g., for Azure OpenAI)")
 
@@ -46,6 +54,8 @@ class BrowserSettings(BaseModel):
     disable_security: bool = Field(
         True, description="Disable browser security features"
     )
+    rate_limit: int = Field(5, description="Maximum requests per second")
+    respect_robots_txt: bool = Field(True, description="Enable robots.txt compliance")
     extra_chromium_args: List[str] = Field(
         default_factory=list, description="Extra arguments to pass to the browser"
     )

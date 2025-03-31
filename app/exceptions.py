@@ -11,3 +11,11 @@ class OpenManusError(Exception):
 
 class TokenLimitExceeded(OpenManusError):
     """Exception raised when the token limit is exceeded"""
+
+
+class DataProcessingError(OpenManusError):
+    """Exception raised when data processing operations fail"""
+    
+    def __init__(self, message):
+        self.message = message
+        super().__init__(message)

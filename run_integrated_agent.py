@@ -1,17 +1,16 @@
 import asyncio
 import sys
-import time
 
-from app.flow.integrated_flow import IntegratedFlow
+from app.agent.integrated_agent import IntegratedAgent
 from app.logger import logger
 from app.session import session_manager
 
 
 async def main():
     """
-    Main entry point for the integrated AI assistant flow system.
+    Main entry point for the integrated AI assistant system.
     
-    This script initializes the IntegratedFlow which provides a unified interface
+    This script initializes the IntegratedAgent which provides a unified interface
     to both general-purpose and software development AI assistants. The system
     automatically routes queries to the appropriate specialized agent based on
     content analysis.
@@ -22,8 +21,8 @@ async def main():
     print("2. Software Development AI Assistant - for coding and technical tasks")
     print("\nYour queries will be automatically routed to the appropriate assistant.")
     
-    # Initialize the integrated flow
-    flow = IntegratedFlow()
+    # Initialize the integrated agent
+    agent = IntegratedAgent()
     session = session_manager.create_session()
     
     print("\nIntegrated AI Assistant initialized. Type 'exit' to quit.")
@@ -43,11 +42,11 @@ async def main():
                 
             if prompt.lower() == 'stats':
                 # Display routing statistics
-                if not flow.integrated_agent.routing_history:
+                if not agent.routing_history:
                     print("No queries processed yet.")
                 else:
-                    total = len(flow.integrated_agent.routing_history)
-                    dev_count = sum(1 for entry in flow.integrated_agent.routing_history if entry["is_code_related"])
+                    total = len(agent.routing_history)
+                    dev_count = sum(1 for entry in agent.routing_history if entry["is_code_related"])
                     general_count = total - dev_count
                     
                     print(f"\nRouting Statistics:")
@@ -57,7 +56,7 @@ async def main():
                     
                     # Show the last 5 routing decisions
                     print("\nRecent routing decisions:")
-                    for i, entry in enumerate(flow.integrated_agent.routing_history[-5:]):
+                    for i, entry in enumerate(agent.routing_history[-5:]):
                         agent_type = "Software Dev" if entry["is_code_related"] else "General-Purpose"
                         prompt_preview = entry["prompt"][:50] + "..." if len(entry["prompt"]) > 50 else entry["prompt"]
                         print(f"{i+1}. '{prompt_preview}' → {agent_type} Agent")
@@ -70,34 +69,25 @@ async def main():
             # Mark session as active
             session.mark_active()
             
-            # Process the request through the integrated flow
+            # Process the request through the integrated agent
             logger.warning("Processing your request...")
-            try:
-                start_time = time.time()
-                result = await asyncio.wait_for(
-                    flow.execute(prompt),
-                    timeout=3600,  # 60 minute timeout for the entire execution
-                )
-                elapsed_time = time.time() - start_time
-                logger.info(f"Request processed in {elapsed_time:.2f} seconds")
-                logger.info(result)
-                
-                # Record task in session history
-                success = flow.integrated_agent.state == "FINISHED"
-                session.add_task(prompt, result, success)
-                
-                # Mark session as waiting for next input
+            result = await agent.run(prompt)
+            
+            # Record task in session history
+            success = agent.state == "FINISHED"
+            session.add_task(prompt, result, success)
+            
+            # If agent is in FINISHED state, mark session as waiting
+            if agent.state == "FINISHED":
                 session.mark_waiting()
                 
-            except asyncio.TimeoutError:
-                logger.error("Request processing timed out after 1 hour")
-                logger.info(
-                    "Operation terminated due to timeout. Please try a simpler request."
-                )
-                session.add_task(prompt, "Request timed out", False)
+            logger.info("Request processing completed.")
             
     except KeyboardInterrupt:
         logger.warning("Operation interrupted.")
+        session.mark_terminated()
+    except Exception as e:
+        logger.error(f"Error in main loop: {str(e)}")
         session.mark_terminated()
 
 

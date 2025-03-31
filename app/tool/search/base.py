@@ -1,6 +1,6 @@
 class WebSearchEngine(object):
     def perform_search(
-        self, query: str, num_results: int = 10, *args, **kwargs
+        self, query: str, num_results: int = 50, *args, **kwargs
     ) -> list[dict]:
         """
         Perform a web search and return a list of URLs.

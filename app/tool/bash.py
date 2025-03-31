@@ -1,5 +1,6 @@
 import asyncio
 import os
+import platform
 from typing import Optional
 
 from app.exceptions import ToolError
@@ -32,15 +33,28 @@ class _BashSession:
         if self._started:
             return
 
-        self._process = await asyncio.create_subprocess_shell(
-            self.command,
-            preexec_fn=os.setsid,
-            shell=True,
-            bufsize=0,
-            stdin=asyncio.subprocess.PIPE,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
+        # Create subprocess with platform-specific options
+        # os.setsid is only available on Unix-based systems
+        if platform.system() == "Windows":
+            self._process = await asyncio.create_subprocess_shell(
+                self.command,
+                shell=True,
+                bufsize=0,
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+        else:
+            # Unix-based systems can use os.setsid
+            self._process = await asyncio.create_subprocess_shell(
+                self.command,
+                preexec_fn=os.setsid,
+                shell=True,
+                bufsize=0,
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
 
         self._started = True
 

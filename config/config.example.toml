@@ -1,32 +1,77 @@
 # Global LLM configuration
 [llm]
-model = "gemini-2.0-pro-exp-02-05"            # The LLM model to use
+model = "gemini-2.0-flash"
 base_url = "https://generativelanguage.googleapis.com/v1beta" # API endpoint URL
-api_key = "AIzaSyBfuMOORb6H7s0clpko58Zk1iNoPvCR_sw"                     # Your API key
-max_tokens = 8192                      # Maximum number of tokens in the response
+api_key = "AIzaSyDaqaJfVTsbdi6wNqM88wjSPHsglATg-Kc"
+max_tokens = 32000                  # Maximum number of tokens in the response
 temperature = 0.0                      # Controls randomness
+allowed_domains = ["example.com", "trusted.org"]  # Allowed domains for ethical scraping
+allowed_content_types = ["text/html", "application/pdf"]  # Permitted content types
 # max_input_tokens = 100000            # Maximum input tokens to use across all requests (set to null or delete this line for unlimited)
 
-# You can define model-specific overrides
-[llm.gpt4]
-model = "gpt-4"
-temperature = 0.7
 
-# Browser configuration
+# [llm] #OLLAMA:
+# api_type = 'ollama'
+# model = "llama3.2"
+# base_url = "http://localhost:11434/v1"
+# api_key = "ollama"
+# max_tokens = 4096
+# temperature = 0.0
+
+# Optional configuration for specific LLM models
+#[llm.vision]
+#model = "claude-3-7-sonnet"            # The vision model to use
+#base_url = "https://api.openai.com/v1" # API endpoint URL for vision model
+#api_key = "sk-..."                     # Your API key for vision model
+#max_tokens = 8192                      # Maximum number of tokens in the response
+#temperature = 0.0                      # Controls randomness
+#allowed_domains = ["example.com", "trusted.org"]  # Allowed domains for ethical scraping
+#allowed_content_types = ["text/html", "application/pdf"]  # Permitted content types for vision model
+
+# [llm.vision] #OLLAMA VISION:
+# api_type = 'ollama'
+# model = "llama3.2-vision"
+# base_url = "http://localhost:11434/v1"
+# api_key = "ollama"
+# max_tokens = 4096
+# temperature = 0.0
+
+# Browser automation configuration
 [browser]
-headless = false  # Set to true for production use
+headless = true  # Run in headless mode by default for scaling
 disable_security = true
-extra_chromium_args = []
-# chrome_instance_path = ""  # Uncomment and set if needed
-# wss_url = ""  # Uncomment and set if needed
-# cdp_url = ""  # Uncomment and set if needed
+rate_limit = 50  # Maximum requests per second
+respect_robots_txt = true  # Enable robots.txt compliance
 
-# Browser proxy configuration (optional)
+# Extra arguments to pass to the browser
+extra_chromium_args = [
+  "--disable-blink-features=AutomationControlled",
+  "--force-device-scale-factor=1"
+]
+
+# Path to a Chrome instance to use to connect to your normal browser
+# e.g. '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+#chrome_instance_path = ""
+# Connect to a browser instance via WebSocket
+#wss_url = ""
+# Connect to a browser instance via CDP
+#cdp_url = ""
+
+# Optional configuration, Proxy settings for the browser
 # [browser.proxy]
 # server = "http://proxy-server:port"
 # username = "proxy-username"
 # password = "proxy-password"
 
-# Search configuration
-[search]
-engine = "Google"  # Search engine to use
+# Optional configuration, Search settings.
+# [search]
+# Search engine for agent to use. Default is "Google", can be set to "Baidu" or "DuckDuckGo".
+engine = "Google"
+
+# [llm] #OPENROUTER:
+# api_type = 'openai'
+# model = "openai/gpt-3.5-turbo"
+# base_url = "https://openrouter.ai/api/v1"
+# api_key = "your-openrouter-api-key"
+# max_tokens = 4096
+# temperature = 0.7

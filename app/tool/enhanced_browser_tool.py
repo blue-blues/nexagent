@@ -15,6 +15,7 @@ from pydantic_core.core_schema import ValidationInfo
 from app.config import config
 from app.tool.base import BaseTool, ToolResult
 from app.tool.browser_use_tool import BrowserUseTool
+from app.tool.data_processor import DataProcessor
 
 
 class EnhancedBrowserTool(BrowserUseTool):
@@ -386,6 +387,16 @@ class EnhancedBrowserTool(BrowserUseTool):
                                 result["pagination"] = pagination_info
 
                             # Return full comprehensive data
+                            # Store captured data
+                            if self.data_collection_enabled:
+                                try:
+                                    processor = DataProcessor()
+                                    output_path = processor.process(result, url, "text/html")
+                                    self.collected_data.append(str(output_path))
+                                except Exception as e:
+                                    logger.error(f"Ethical data processing failed: {str(e)}")
+                                    raise
+
                             return ToolResult(output=f"Successfully navigated to {url} and extracted comprehensive content:\n\n{json.dumps(result, ensure_ascii=False)}")
 
                         else:

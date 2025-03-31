@@ -61,6 +61,8 @@ class LLM:
             self.api_key = llm_config.api_key
             self.api_version = llm_config.api_version
             self.base_url = llm_config.base_url
+            self.allowed_domains = llm_config.allowed_domains
+            self.allowed_content_types = llm_config.allowed_content_types
 
             # Add token counting related attributes
             self.total_input_tokens = 0
@@ -97,6 +99,18 @@ class LLM:
                 )
             else:
                 self.client = AsyncOpenAI(api_key=self.api_key, base_url=self.base_url)
+
+    def validate_request_ethics(self, url: str, content_type: str):
+        """Validate if a request meets ethical scraping criteria."""
+        from urllib.parse import urlparse
+        
+        parsed_url = urlparse(url)
+        domain = parsed_url.netloc
+        
+        if self.allowed_domains and domain not in self.allowed_domains:
+            raise ValueError(f"Domain {domain} not in allowed list")
+        if content_type not in self.allowed_content_types:
+            raise ValueError(f"Content type {content_type} not permitted")
 
     def count_tokens(self, text: str) -> int:
         """Calculate the number of tokens in a text"""
