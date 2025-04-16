@@ -1,0 +1,42 @@
+# Global LLM configuration
+[llm]
+model = "gemini-2.0-flash"
+base_url = "https://generativelanguage.googleapis.com/v1beta" # API endpoint URL
+api_key = "YOUR_API_KEY_HERE"
+max_tokens = 32000                  # Maximum number of tokens in the response
+temperature = 0.0                      # Controls randomness
+api_call_delay = 5              # Delay between API calls in seconds
+python_execute_timeout = 60      # Timeout for Python code execution in seconds
+bash_timeout = 300.0                   # Timeout for bash commands in seconds
+
+# Browser automation configuration
+[browser]
+headless = true  # Run in headless mode by default for scaling
+disable_security = true
+rate_limit = 50  # Maximum requests per second
+respect_robots_txt = true  # Enable robots.txt compliance
+
+# Fallback browser settings
+enable_fallback = true  # Enable automatic fallback to browser-use/web-ui when scraping fails
+max_fallback_attempts = 3  # Maximum number of fallback attempts before giving up
+web_ui_url = "http://localhost:3000"  # URL for the browser-use/web-ui service
+
+# Extra arguments to pass to the browser
+extra_chromium_args = [
+  "--disable-blink-features=AutomationControlled",
+  "--force-device-scale-factor=1"
+]
+
+# Optional configuration, Search settings.
+[search]
+# Search engine for agent to use. Default is "Google", can be set to "Baidu" or "DuckDuckGo".
+engine = "Google"
+
+# Git configuration
+[git]
+user_name = "your-username"  # Your Git username
+user_email = "your-email@example.com"  # Your Git email
+default_branch = "main"  # Default branch name
+auto_commit = false  # Whether to automatically commit changes
+auto_push = false  # Whether to automatically push changes
+commit_message_template = "feat: {message}"  # Template for commit messages
