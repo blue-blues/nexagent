@@ -1,1 +1,0 @@
-The result of 5+5 is 10.

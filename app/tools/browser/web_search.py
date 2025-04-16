@@ -2,14 +2,20 @@ import asyncio
 from typing import List
 
 from app.config import config
-from tenacity import retry, stop_after_attempt, wait_exponential
 from app.tools.base import BaseTool
+from app.logger import logger
 from app.tools.search import (
     WebSearchEngine,
     GoogleSearchEngine,
     DuckDuckGoSearchEngine,
     BaiduSearchEngine
 )
+
+# Import BraveSearchEngine if available
+try:
+    from app.tools.search.brave_search import BraveSearchEngine
+except ImportError:
+    BraveSearchEngine = None
 
 class WebSearch(BaseTool):
     name: str = "web_search"
@@ -31,11 +37,23 @@ class WebSearch(BaseTool):
         },
         "required": ["query"],
     }
-    _search_engine: dict[str, WebSearchEngine] = {
-        "google": GoogleSearchEngine(),
-        "baidu": BaiduSearchEngine(),
-        "duckduckgo": DuckDuckGoSearchEngine(),
-    }
+    def __init__(self):
+        """Initialize the WebSearch tool with available search engines."""
+        super().__init__()
+        # Initialize search engines
+        self._search_engine = {
+            "google": GoogleSearchEngine(),
+            "baidu": BaiduSearchEngine(),
+            "duckduckgo": DuckDuckGoSearchEngine(),
+        }
+
+        # Add Brave search engine if available
+        if BraveSearchEngine is not None:
+            try:
+                self._search_engine["brave"] = BraveSearchEngine()
+                logger.info("Brave search engine added to WebSearch tool")
+            except Exception as e:
+                logger.error(f"Error initializing Brave search engine: {str(e)}")
 
     async def execute(self, query: str, num_results: int = 100) -> List[str]:
         """

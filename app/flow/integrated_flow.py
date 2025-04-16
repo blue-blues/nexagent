@@ -6,6 +6,7 @@ from app.agent.integrated_agent import IntegratedAgent
 from app.flow.base import BaseFlow
 from app.logger import logger
 from app.memory.conversation_memory import conversation_memory
+from app.memory.memory_reasoning import MemoryReasoning
 from app.tool.output_organizer import OutputOrganizer
 from app.tools.conversation_file_saver import ConversationFileSaver
 from app.tools.message_classifier import MessageClassifier
@@ -70,6 +71,9 @@ class IntegratedFlow(BaseFlow):
             logger.error(f"Error initializing MessageClassifier: {str(e)}")
             logger.info("Falling back to simple prompt detection")
             self._message_classifier = None
+
+        # Initialize memory reasoning system
+        self._memory_reasoning = None
 
     @property
     def integrated_agent(self) -> IntegratedAgent:
@@ -285,12 +289,12 @@ class IntegratedFlow(BaseFlow):
                         if cleaned_input.startswith(msg):
                             cleaned_input = cleaned_input[len(msg):].strip()
 
-                    # Classify the message with thresholds that favor chat classification
+                    # Classify the message with thresholds that favor agent classification
                     classification_result = await self._message_classifier.execute(
                         message=cleaned_input,
                         threshold_override={
-                            "chat_threshold": 0.60,  # Lower threshold to classify more messages as chat
-                            "agent_threshold": 0.40  # Higher threshold to require more confidence for agent routing
+                            "chat_threshold": 0.75,  # Higher threshold to require more confidence for chat classification
+                            "agent_threshold": 0.25  # Lower threshold to classify more messages as agent
                         }
                     )
                     if not classification_result.error:
@@ -460,6 +464,31 @@ class IntegratedFlow(BaseFlow):
                         "agent_id": "integrated_agent"
                     }
                 )
+
+                # Also store in memory reasoning system if available
+                if self._memory_reasoning:
+                    logger.info(f"Storing conversation in memory reasoning system for conversation {self._conversation_id}")
+                    # Store user input
+                    self._memory_reasoning.add_memory(
+                        content=input_text,
+                        source="user",
+                        importance=0.7,  # User messages are more important
+                        metadata={
+                            "conversation_id": self._conversation_id,
+                            "timestamp": datetime.now().isoformat()
+                        }
+                    )
+
+                    # Store agent response
+                    self._memory_reasoning.add_memory(
+                        content=result,
+                        source="agent",
+                        importance=0.6,  # Agent responses are important
+                        metadata={
+                            "conversation_id": self._conversation_id,
+                            "timestamp": datetime.now().isoformat()
+                        }
+                    )
 
             return result
 

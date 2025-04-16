@@ -145,6 +145,10 @@ class IntegratedAgent(BaseAgent):
                         if 'file_saver' in selected_agent.available_tools.tool_map:
                             selected_agent.available_tools.tool_map['file_saver'] = self._file_saver
                             logger.info(f"Updated agent's file_saver tool to use conversation-aware version")
+
+                        # Add browser tools if they're not already in the agent's tools
+                        # We'll use the agent's existing tools instead of trying to get them from the server
+                        # to avoid circular imports
                 except Exception as e:
                     logger.error(f"Error setting up conversation file saver: {str(e)}")
 

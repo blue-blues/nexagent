@@ -52,6 +52,9 @@ class NexagentServer:
     _health_check_rate_limit = {}
     _rate_limit_window = 10  # seconds (increased from 5)
     _rate_limit_max_requests = 10  # max requests per window (increased from 2)
+    _tools = {}  # Dictionary to store registered tools
+    _memory_reasoning = None  # Memory reasoning instance
+    _flow_initializers = []  # List of flow initializer functions
 
     def __new__(cls):
         if cls._instance is None:
@@ -176,6 +179,9 @@ class NexagentServer:
             try:
                 # Initialize the flow with the conversation ID
                 flow = IntegratedFlow(conversation_id=conversation_id)
+
+                # Initialize the flow with registered initializers
+                self.initialize_flow(flow)
 
                 # Create a timeline for this request
                 timeline = Timeline()
@@ -694,6 +700,64 @@ class NexagentServer:
     def get_url(self):
         """Get the URL of the Nexagent API server"""
         return f"http://{self._host}:{self._port}"
+
+    def register_tool(self, tool):
+        """Register a tool with the Nexagent server
+
+        Args:
+            tool: The tool to register
+        """
+        self._tools[tool.name] = tool
+        logger.info(f"Registered tool: {tool.name}")
+
+    def get_tool(self, tool_name):
+        """Get a registered tool by name
+
+        Args:
+            tool_name: The name of the tool to get
+
+        Returns:
+            The tool if found, None otherwise
+        """
+        return self._tools.get(tool_name)
+
+    def register_memory_reasoning(self, memory_reasoning):
+        """Register a memory reasoning instance with the Nexagent server
+
+        Args:
+            memory_reasoning: The memory reasoning instance to register
+        """
+        self._memory_reasoning = memory_reasoning
+        logger.info("Registered memory reasoning system")
+
+    def get_memory_reasoning(self):
+        """Get the registered memory reasoning instance
+
+        Returns:
+            The memory reasoning instance if registered, None otherwise
+        """
+        return self._memory_reasoning
+
+    def register_flow_initializer(self, initializer_func):
+        """Register a flow initializer function
+
+        Args:
+            initializer_func: A function that takes a flow instance and initializes it
+        """
+        self._flow_initializers.append(initializer_func)
+        logger.info(f"Registered flow initializer: {initializer_func.__name__ if hasattr(initializer_func, '__name__') else 'anonymous'}")
+
+    def initialize_flow(self, flow):
+        """Initialize a flow with all registered initializers
+
+        Args:
+            flow: The flow instance to initialize
+        """
+        for initializer in self._flow_initializers:
+            try:
+                initializer(flow)
+            except Exception as e:
+                logger.error(f"Error in flow initializer {initializer.__name__ if hasattr(initializer, '__name__') else 'anonymous'}: {str(e)}")
 
     def _format_response_for_display(self, response: str) -> str:
         """

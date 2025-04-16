@@ -71,6 +71,12 @@ class MessageClassifier(BaseTool):
         "predict", "forecast", "project", "estimate",
         "recommend", "suggest", "advise", "propose",
         "can you", "could you", "would you", "please",
+        # Web search related keywords
+        "web search", "using web search", "search the web", "find information", "look up information",
+        "research online", "find online", "search online", "browse", "web browse", "internet search",
+        "google", "bing", "search engine", "web results", "online information", "internet research",
+        "hospitals", "companies", "organizations", "businesses", "institutions", "centers",
+        "compare companies", "compare organizations", "compare businesses", "compare hospitals",
     ], description="Keywords that indicate a message likely requires agent processing")
 
     # Indicators of complexity that suggest agent processing
@@ -186,6 +192,53 @@ class MessageClassifier(BaseTool):
         else:
             return 0.0  # No code detected
 
+    def _calculate_web_search_score(self, message: str) -> float:
+        """Calculate a score based on whether the message is requesting web search."""
+        message_lower = message.lower()
+
+        # Check for explicit web search requests
+        web_search_phrases = [
+            "web search", "using web search", "search the web", "find information", "look up information",
+            "research online", "find online", "search online", "browse", "web browse", "internet search",
+            "google", "bing", "search engine", "web results", "online information", "internet research"
+        ]
+
+        # Check for comparison requests that likely need web search
+        comparison_phrases = [
+            "compare", "comparison", "versus", "vs", "difference between", "similarities between",
+            "better than", "worse than", "advantages of", "disadvantages of", "pros and cons"
+        ]
+
+        # Check for entity types that likely need web search
+        entity_types = [
+            "hospitals", "companies", "organizations", "businesses", "institutions", "centers",
+            "products", "services", "technologies", "platforms", "tools", "software", "hardware"
+        ]
+
+        # Calculate score based on presence of indicators
+        score = 0.0
+
+        # Check for explicit web search phrases
+        for phrase in web_search_phrases:
+            if phrase in message_lower:
+                score += 0.7  # Strong indicator
+                break
+
+        # Check for comparison phrases
+        for phrase in comparison_phrases:
+            if phrase in message_lower:
+                score += 0.4  # Moderate indicator
+                break
+
+        # Check for entity types
+        for entity in entity_types:
+            if entity in message_lower:
+                score += 0.3  # Moderate indicator
+                break
+
+        # Cap the score at 1.0
+        return min(1.0, score)
+
     def _analyze_message(self, message: str) -> Dict[str, Any]:
         """
         Analyze a message to determine if it's a chat message or requires agent processing.
@@ -208,6 +261,9 @@ class MessageClassifier(BaseTool):
         question_score = self._calculate_question_score(message)
         code_score = self._calculate_code_score(message)
 
+        # Check for web search indicators
+        web_search_score = self._calculate_web_search_score(message)
+
         # Calculate keyword density (normalized by message length)
         word_count = max(1, len(message.split()))
         keyword_density = min(1.0, agent_keyword_count / word_count * 5)  # Scale up for significance
@@ -226,16 +282,18 @@ class MessageClassifier(BaseTool):
                 question_score * 0.2 +
                 code_score * 0.3 +
                 keyword_density * 0.1 +
-                complexity_density * 0.1
+                complexity_density * 0.1 +
+                web_search_score * 0.4  # Web search is a strong indicator against chat
             ))
 
-        # Agent score increases with length, question indicators, code, keywords, and complexity
+        # Agent score increases with length, question indicators, code, keywords, complexity, and web search
         agent_score = (
             length_score * 0.2 +
             question_score * 0.2 +
             code_score * 0.3 +
             keyword_density * 0.2 +
-            complexity_density * 0.1
+            complexity_density * 0.1 +
+            web_search_score * 0.4  # Web search is a strong indicator for agent
         )
 
         # Ensure scores are in valid range
@@ -251,6 +309,7 @@ class MessageClassifier(BaseTool):
             "length_score": length_score,
             "question_score": question_score,
             "code_score": code_score,
+            "web_search_score": web_search_score,
             "keyword_density": keyword_density,
             "complexity_density": complexity_density,
             "word_count": word_count,

@@ -4,6 +4,7 @@ logs/
 
 # Data
 data/
+data_store/
 
 # Workspace
 workspace/

@@ -8,6 +8,12 @@ from app.tools.search.google_search import GoogleSearchEngine
 from app.tools.search.duckduckgo_search import DuckDuckGoSearchEngine
 from app.tools.search.baidu_search import BaiduSearchEngine
 
+# Import Brave search engine if available
+try:
+    from app.tools.search.brave_search import BraveSearchEngine
+except ImportError:
+    BraveSearchEngine = None
+
 # Import from parent directory if it exists there
 try:
     from app.tools.web_search import WebSearch
@@ -19,5 +25,6 @@ __all__ = [
     'GoogleSearchEngine',
     'DuckDuckGoSearchEngine',
     'BaiduSearchEngine',
+    'BraveSearchEngine',
     'WebSearch'
 ]
