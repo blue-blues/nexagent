@@ -15,6 +15,7 @@ from app.logger import logger
 from app.memory import MemoryReasoning
 from app.tools.browser import WebSearch, EnhancedBrowserTool
 from app.tools.search.brave_search import BraveSearchEngine
+from app.tools.git_tool import GitTool
 
 def parse_args():
     """Parse command line arguments"""
@@ -62,6 +63,16 @@ def setup_memory_reasoning():
 
     logger.info("Memory reasoning initialized and registered")
 
+def setup_git_tool():
+    """Set up Git tool for the Nexagent server"""
+    # Initialize Git tool
+    git_tool = GitTool()
+
+    # Register Git tool with the server
+    nexagent_server.register_tool(git_tool)
+
+    logger.info("Git tool initialized and registered")
+
 def main():
     """Main entry point for the API server"""
     args = parse_args()
@@ -75,6 +86,9 @@ def main():
 
     # Set up memory reasoning
     setup_memory_reasoning()
+
+    # Set up Git tool
+    setup_git_tool()
 
     # Start the server
     nexagent_server.start(host=args.host, port=args.port)
