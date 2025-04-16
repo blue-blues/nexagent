@@ -21,6 +21,7 @@ class MessageRequest(BaseModel):
     conversation_id: Optional[str] = Field(None, description="Conversation ID if continuing an existing conversation")
     system_prompt: Optional[str] = Field(None, description="Optional system prompt to override default")
     parameters: Optional[Dict[str, Any]] = Field(None, description="Optional parameters for the agent")
+    processing_mode: Optional[str] = Field("auto", description="Processing mode: 'auto', 'chat', or 'agent'")
 
 class MessageResponse(BaseModel):
     id: str = Field(..., description="Message ID")
@@ -187,7 +188,14 @@ class NexagentServer:
                 timeline = Timeline()
 
                 # Process the request with timeline tracking
-                result = await flow.execute(request.content, conversation_id=conversation_id, timeline=timeline)
+                # Pass the processing_mode parameter if provided
+                processing_mode = request.processing_mode if request.processing_mode else "auto"
+                result = await flow.execute(
+                    input_text=request.content,
+                    conversation_id=conversation_id,
+                    timeline=timeline,
+                    processing_mode=processing_mode
+                )
 
                 # Get the timeline data
                 timeline_data = timeline.to_dict() if timeline else None

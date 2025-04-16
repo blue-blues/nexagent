@@ -216,7 +216,7 @@ class IntegratedFlow(BaseFlow):
         # If no clear final output section is found, return the original result
         return result
 
-    async def execute(self, input_text: str = None, prompt: str = None, conversation_id: Optional[str] = None, timeline: Optional[Timeline] = None, **kwargs) -> Union[str, ToolResult]:
+    async def execute(self, input_text: str = None, prompt: str = None, conversation_id: Optional[str] = None, timeline: Optional[Timeline] = None, processing_mode: str = "auto", **kwargs) -> Union[str, ToolResult]:
         """
         Execute the integrated flow with the given input.
 
@@ -276,46 +276,64 @@ class IntegratedFlow(BaseFlow):
                 conversation_id=self._conversation_id
             )
 
-            # Use the message classifier to determine if this is a chat message or requires agent processing
+            # Determine the message type based on processing_mode parameter
             message_type = "chat"  # Default to chat if classifier is not available
             classification_result = None
 
-            if self._message_classifier is not None:
-                try:
-                    # Clean the input text to remove common UI messages
-                    cleaned_input = input_text
-                    ui_messages = ["What would you like to do next?", "What can I help you with?"]
-                    for msg in ui_messages:
-                        if cleaned_input.startswith(msg):
-                            cleaned_input = cleaned_input[len(msg):].strip()
+            # Check if processing_mode is explicitly set
+            if processing_mode == "chat":
+                message_type = "chat"
+                logger.info(f"Using chat mode as explicitly requested by user")
+                create_system_event(
+                    active_timeline,
+                    "Processing Mode",
+                    f"Using chat mode as explicitly requested by user"
+                )
+            elif processing_mode == "agent":
+                message_type = "agent"
+                logger.info(f"Using agent mode as explicitly requested by user")
+                create_system_event(
+                    active_timeline,
+                    "Processing Mode",
+                    f"Using agent mode as explicitly requested by user"
+                )
+            else:  # Auto mode - use classifier
+                if self._message_classifier is not None:
+                    try:
+                        # Clean the input text to remove common UI messages
+                        cleaned_input = input_text
+                        ui_messages = ["What would you like to do next?", "What can I help you with?"]
+                        for msg in ui_messages:
+                            if cleaned_input.startswith(msg):
+                                cleaned_input = cleaned_input[len(msg):].strip()
 
-                    # Classify the message with thresholds that favor agent classification
-                    classification_result = await self._message_classifier.execute(
-                        message=cleaned_input,
-                        threshold_override={
-                            "chat_threshold": 0.75,  # Higher threshold to require more confidence for chat classification
-                            "agent_threshold": 0.25  # Lower threshold to classify more messages as agent
-                        }
-                    )
-                    if not classification_result.error:
-                        message_type = classification_result.output["classification"]
-                        analysis = classification_result.output["analysis"]
-                        logger.info(f"Message classified as '{message_type}' (chat_score={analysis['chat_score']:.2f}, agent_score={analysis['agent_score']:.2f})")
-
-                        # Add classification event to timeline
-                        create_system_event(
-                            active_timeline,
-                            "Message Classification",
-                            f"Message classified as '{message_type}' (chat_score={analysis['chat_score']:.2f}, agent_score={analysis['agent_score']:.2f})"
+                        # Classify the message with thresholds that favor agent classification
+                        classification_result = await self._message_classifier.execute(
+                            message=cleaned_input,
+                            threshold_override={
+                                "chat_threshold": 0.75,  # Higher threshold to require more confidence for chat classification
+                                "agent_threshold": 0.25  # Lower threshold to classify more messages as agent
+                            }
                         )
-                    else:
-                        logger.warning(f"Error classifying message: {classification_result.output.get('error', 'Unknown error')}")
-                except Exception as e:
-                    logger.error(f"Error using message classifier: {str(e)}")
-            else:
-                # Fall back to simple prompt detection if classifier is not available
-                message_type = "chat" if is_simple_prompt(input_text) else "agent"
-                logger.info(f"Using fallback classification: '{message_type}'")
+                        if not classification_result.error:
+                            message_type = classification_result.output["classification"]
+                            analysis = classification_result.output["analysis"]
+                            logger.info(f"Message classified as '{message_type}' (chat_score={analysis['chat_score']:.2f}, agent_score={analysis['agent_score']:.2f})")
+
+                            # Add classification event to timeline
+                            create_system_event(
+                                active_timeline,
+                                "Message Classification",
+                                f"Message classified as '{message_type}' (chat_score={analysis['chat_score']:.2f}, agent_score={analysis['agent_score']:.2f})"
+                            )
+                        else:
+                            logger.warning(f"Error classifying message: {classification_result.output.get('error', 'Unknown error')}")
+                    except Exception as e:
+                        logger.error(f"Error using message classifier: {str(e)}")
+                else:
+                    # Fall back to simple prompt detection if classifier is not available
+                    message_type = "chat" if is_simple_prompt(input_text) else "agent"
+                    logger.info(f"Using fallback classification: '{message_type}'")
 
             # Handle chat messages directly
             if message_type == "chat":
