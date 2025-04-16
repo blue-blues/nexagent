@@ -11,7 +11,7 @@ from app.timeline.events import create_user_input_event, create_error_event
 from app.integration.adaptive_nexagent import AdaptiveNexagentIntegration
 
 
-async def process_request(prompt: str, adaptive_nexagent: AdaptiveNexagentIntegration, session_id: Optional[str] = None) -> dict:
+async def process_request(prompt: str, adaptive_nexagent: AdaptiveNexagentIntegration, session_id: Optional[str] = None, processing_mode: str = "auto") -> dict:
     """
     Process a user request through the adaptive nexagent integration.
 
@@ -19,6 +19,7 @@ async def process_request(prompt: str, adaptive_nexagent: AdaptiveNexagentIntegr
         prompt: The user's input prompt
         adaptive_nexagent: The AdaptiveNexagentIntegration instance
         session_id: Optional session ID
+        processing_mode: Processing mode ('auto', 'chat', or 'agent')
 
     Returns:
         A dictionary with the processing results
@@ -28,7 +29,7 @@ async def process_request(prompt: str, adaptive_nexagent: AdaptiveNexagentIntegr
         response = await adaptive_nexagent.process_prompt(
             prompt=prompt,
             conversation_id=session_id,
-            context={}
+            context={"processing_mode": processing_mode}
         )
 
         # Extract the result and timeline
@@ -150,6 +151,10 @@ async def main():
     print("Type 'stats' to see performance statistics.")
     print("Type 'feedback' to provide feedback on the last response.")
     print("Type 'save' to save the learning system state.")
+    print("Type 'mode chat' to use chat mode, 'mode agent' to use agent mode, or 'mode auto' to use automatic detection.")
+
+    # Default processing mode
+    processing_mode = "auto"
 
     try:
         while True:
@@ -169,6 +174,15 @@ async def main():
                 print("\nGenerating performance report...")
                 report = adaptive_nexagent.generate_performance_report()
                 print("\n" + report)
+                continue
+
+            if prompt.lower().startswith('mode '):
+                mode = prompt.lower().split(' ')[1] if len(prompt.lower().split(' ')) > 1 else ''
+                if mode in ['chat', 'agent', 'auto']:
+                    processing_mode = mode
+                    print(f"Processing mode set to: {processing_mode}")
+                else:
+                    print("Invalid mode. Available modes: 'chat', 'agent', 'auto'")
                 continue
 
             if prompt.lower() == 'feedback':
@@ -213,13 +227,13 @@ async def main():
             session.mark_active()
 
             # Process the request through the adaptive nexagent
-            logger.warning("Processing your request...")
-            print("Processing your request... (This may take a moment)")
+            logger.warning(f"Processing your request in {processing_mode} mode...")
+            print(f"Processing your request in {processing_mode} mode... (This may take a moment)")
 
             # Process the request with a timeout
             try:
                 response = await asyncio.wait_for(
-                    process_request(prompt, adaptive_nexagent, session.session_id),
+                    process_request(prompt, adaptive_nexagent, session.session_id, processing_mode),
                     timeout=3600,  # 60 minute timeout for the entire execution
                 )
 
