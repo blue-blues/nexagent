@@ -1,0 +1,15 @@
+{
+  "id": "c558db89-5797-47d4-92d9-78e1d34b80bc",
+  "title": "Conversation c558db89-5797-47d4-92d9-78e1d34b80bc",
+  "created_at": "2025-04-08T13:11:58.386638",
+  "updated_at": "2025-04-08T13:14:00.870934",
+  "outputs": [
+    {
+      "name": "response_20250408131400.txt",
+      "original_name": "response.txt",
+      "type": "document",
+      "path": "D:\\code\\manus\\OpenManus\\nexagent\\data_store\\conversations\\c558db89-5797-47d4-92d9-78e1d34b80bc\\outputs\\response_20250408131400.txt",
+      "added_at": "2025-04-08T13:14:00.870934"
+    }
+  ]
+}

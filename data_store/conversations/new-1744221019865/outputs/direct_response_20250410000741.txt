@@ -1,0 +1,7 @@
+Yes, there are several LLM models that have been created by India. Here are a few notable examples:
+
+*   **Krutrim:** Developed by Ola AI, Krutrim is a family of LLMs that can understand and generate text in multiple Indian languages. It is trained on a large dataset of Indian languages and aims to be a comprehensive AI solution for the Indian market.
+*   **BharatGPT:** This is an open-source LLM developed as a collaborative effort involving multiple Indian institutions and researchers. It focuses on supporting Indian languages and addressing the specific needs of the Indian context.
+*   **AI4Bharat Models:** AI4Bharat is an open-source initiative that has developed several LLMs and NLP tools for Indian languages. These models are designed to be accessible and customizable for various applications.
+
+These are just a few examples, and the field of LLM development in India is rapidly evolving.

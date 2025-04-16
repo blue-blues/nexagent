@@ -4,6 +4,12 @@ from app.tool.search.base import WebSearchEngine
 
 
 class DuckDuckGoSearchEngine(WebSearchEngine):
-    async def perform_search(self, query, num_results=50, *args, **kwargs):
+    def perform_search(self, query, num_results=50, *args, **kwargs):
         """DuckDuckGo search engine."""
-        return DDGS.text(query, num_results=num_results)
+        try:
+            ddgs = DDGS()
+            return ddgs.text(keywords=query, max_results=num_results)
+        except Exception as e:
+            # Log the error but don't raise it to allow fallback to other engines
+            print(f"DuckDuckGo search failed: {e}")
+            return []

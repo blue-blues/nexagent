@@ -4,11 +4,12 @@ from pydantic import Field
 
 from app.agent.toolcall import ToolCallAgent
 from app.prompt.manus import NEXT_STEP_PROMPT, SYSTEM_PROMPT
-from app.tool import Terminate, ToolCollection
-from app.tool.browser_use_tool import BrowserUseTool
-from app.tool.file_saver import FileSaver
-from app.tool.python_execute import PythonExecute
-from app.tool.web_search import WebSearch
+from app.tools import ToolCollection
+from app.tools.terminate import Terminate
+from app.tools.browser import BrowserUseTool
+from app.tools.file_saver import FileSaver
+from app.tools.code import PythonExecute
+from app.tools.browser import WebSearch
 
 
 class Nexagent(ToolCallAgent):

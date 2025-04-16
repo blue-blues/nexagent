@@ -1,0 +1,15 @@
+{
+  "id": "conv_05d29505_1744179188",
+  "title": "Conversation conv_05d29505_1744179188",
+  "created_at": "2025-04-09T11:43:10.032659",
+  "updated_at": "2025-04-09T11:43:10.045660",
+  "outputs": [
+    {
+      "name": "direct_response_20250409114310.txt",
+      "original_name": "direct_response.txt",
+      "type": "document",
+      "path": "D:\\code\\manus\\OpenManus\\nexagent\\data_store\\conversations\\conv_05d29505_1744179188\\outputs\\direct_response_20250409114310.txt",
+      "added_at": "2025-04-09T11:43:10.045660"
+    }
+  ]
+}

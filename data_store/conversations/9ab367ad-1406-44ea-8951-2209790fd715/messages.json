@@ -1,0 +1,15 @@
+[
+  {
+    "id": "5868f0f2-1658-4689-b20d-3df1da5653aa",
+    "role": "user",
+    "content": "what is facebook?",
+    "timestamp": 1744173766720
+  },
+  {
+    "id": "ec13725d-439d-4654-9e82-958a92ba4bac",
+    "role": "assistant",
+    "content": "Integrated flow execution failed: 1 validation error for ToolResult\nerror\n  Input should be a valid string [type=string_type, input_value=True, input_type=bool]\n    For further information visit https://errors.pydantic.dev/2.10/v/string_type",
+    "timestamp": 1744173767935,
+    "timeline": null
+  }
+]

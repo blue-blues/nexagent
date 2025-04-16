@@ -1,0 +1,89 @@
+{
+  "learning_system": {
+    "state_directory": "~/.nexagent/learning_state",
+    "data_retention_days": 90,
+    "exploration_rate": 0.1,
+    "confidence_threshold": 0.7,
+    "learning_rate": 0.1
+  },
+  "memory_store": {
+    "database_path": "~/.nexagent/learning_state/memory.db",
+    "embedding_model": "all-MiniLM-L6-v2",
+    "max_records": 10000
+  },
+  "analytics": {
+    "default_analysis_period_days": 30,
+    "strength_threshold": 0.8,
+    "weakness_threshold": 0.6
+  },
+  "strategy_adaptation": {
+    "exploration_rate": 0.1,
+    "ab_test_duration_days": 7,
+    "min_usage_count_for_adaptation": 10
+  },
+  "knowledge_distillation": {
+    "extraction_batch_size": 100,
+    "template_similarity_threshold": 0.7,
+    "rule_confidence_threshold": 0.6
+  },
+  "feedback_integration": {
+    "implicit_feedback_enabled": true,
+    "correction_phrases": [
+      "that's not what I meant",
+      "that's incorrect",
+      "you misunderstood",
+      "I meant",
+      "actually",
+      "instead",
+      "correction",
+      "wrong",
+      "not right"
+    ],
+    "repetition_phrases": [
+      "repeat",
+      "again",
+      "one more time",
+      "try again"
+    ],
+    "abandonment_phrases": [
+      "nevermind",
+      "forget it",
+      "cancel",
+      "stop",
+      "abort"
+    ],
+    "continuation_phrases": [
+      "continue",
+      "next",
+      "go on",
+      "proceed",
+      "more"
+    ]
+  },
+  "monitoring": {
+    "check_interval_minutes": 60,
+    "thresholds": {
+      "success_rate": 0.7,
+      "execution_time": 10.0,
+      "storage_size_mb": 1000,
+      "interaction_count": 10000
+    },
+    "alerts": {
+      "enabled": false,
+      "email": {
+        "enabled": false,
+        "smtp_server": "smtp.example.com",
+        "smtp_port": 587,
+        "username": "user@example.com",
+        "password": "password",
+        "from_address": "alerts@example.com",
+        "to_addresses": ["admin@example.com"]
+      }
+    }
+  },
+  "maintenance": {
+    "extract_knowledge_schedule": "daily",
+    "analyze_performance_schedule": "weekly",
+    "cleanup_old_data_schedule": "monthly"
+  }
+}

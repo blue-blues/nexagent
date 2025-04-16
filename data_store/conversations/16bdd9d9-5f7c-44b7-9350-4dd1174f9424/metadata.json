@@ -1,0 +1,15 @@
+{
+  "id": "16bdd9d9-5f7c-44b7-9350-4dd1174f9424",
+  "title": "Conversation 16bdd9d9-5f7c-44b7-9350-4dd1174f9424",
+  "created_at": "2025-04-09T11:24:39.489902",
+  "updated_at": "2025-04-09T11:24:42.733348",
+  "outputs": [
+    {
+      "name": "error_20250409112439.txt",
+      "original_name": "error.txt",
+      "type": "error",
+      "path": "D:\\code\\manus\\OpenManus\\nexagent\\data_store\\conversations\\16bdd9d9-5f7c-44b7-9350-4dd1174f9424\\outputs\\error_20250409112439.txt",
+      "added_at": "2025-04-09T11:24:42.733348"
+    }
+  ]
+}

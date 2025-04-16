@@ -5,16 +5,15 @@ pyyaml~=6.0.2
 loguru~=0.7.3
 numpy
 datasets~=3.2.0
-fastapi~=0.115.11
 tiktoken~=0.9.0
 
 html2text~=2024.2.26
 gymnasium~=1.0.0
 pillow~=10.4.0
 browsergym~=0.13.3
-uvicorn~=0.34.0
 unidiff~=0.7.5
-browser-use~=0.1.40
+#browser-use~=0.1.40
+#browser-use-web-ui~=0.1.0
 googlesearch-python~=1.3.0
 baidusearch~=1.0.3
 duckduckgo_search~=7.5.1

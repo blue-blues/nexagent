@@ -118,13 +118,13 @@ The assistant supports multiple programming languages, including:
 
 ## Getting Started
 
-To use the Software Development Assistant, run the main application and select option 2:
+To use the Software Development Assistant, simply run the main application:
 
 ```bash
 python main.py
 ```
 
-Then select "2. Software Development AI Assistant" from the menu.
+The system will automatically handle your queries and route them to the appropriate assistant.
 
 ## Best Practices
 

@@ -46,12 +46,14 @@ Nexagent is a powerful, intelligent agent framework that offers multiple special
 - **Multi-level fallback**: Gracefully handles failures with multiple retry strategies
 - **Self-healing navigation**: Adapts to changes and connection issues automatically
 - **Content-focused extraction**: Intelligently identifies and prioritizes main content
+- **Smart response handling**: Provides direct answers to simple queries without invoking the full agent system
 
 ### Flexible Architecture
 
 - **Modular tool system**: Easily extensible with new capabilities
 - **Multiple extraction strategies**: Extract exactly what you need, from text to full data structures
 - **Configurable behavior**: Fine-tune operation behavior to suit different sources
+- **Enhanced data formatting**: Output data in multiple human-readable formats (JSON, YAML, CSV, tables)
 
 ## 🛠️ Installation
 
@@ -67,11 +69,39 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 # Install dependencies
 pip install -r requirements.txt
 
-# Run the python file
-python main.py
-
-> Enter promt <
+# Check if all required dependencies are installed
+python check_dependencies.py
 ```
+
+## 🚀 Running Nexagent
+
+### CLI Mode
+
+```bash
+# Run in CLI mode
+python main_cli.py
+
+> Enter prompt <
+```
+
+### Web Interface Mode
+
+```bash
+# Run with web interface
+python main.py
+```
+
+### API Server Mode
+
+```bash
+# Run as API server (basic version)
+python run_api_server.py
+
+# Run as API server with conversation organization features
+python run_api_server_with_organization.py
+```
+
+For more details on the API server, see [README_API_SERVER.md](README_API_SERVER.md).
 
 
 ## ⚙️ Configuration
@@ -105,29 +135,79 @@ timeout = 30000   # Default timeout in milliseconds
 ## Examples
 Given Prompt to Nexagent
 ```
-Identify the top-performing small- and mid-cap stocks with strong growth potential. 
-Consider key financial metrics such as revenue growth, earnings per share (EPS), price-to-earnings (P/E) ratio, return on equity (ROE), and 
-debt-to-equity ratio. Analyze technical indicators like moving averages, relative strength index (RSI), and trading volume trends. 
-Additionally, assess industry trends, recent news, and market sentiment to refine stock selection. Provide a ranked list of the top 10 stocks 
+Identify the top-performing small- and mid-cap stocks with strong growth potential.
+Consider key financial metrics such as revenue growth, earnings per share (EPS), price-to-earnings (P/E) ratio, return on equity (ROE), and
+debt-to-equity ratio. Analyze technical indicators like moving averages, relative strength index (RSI), and trading volume trends.
+Additionally, assess industry trends, recent news, and market sentiment to refine stock selection. Provide a ranked list of the top 10 stocks
 with a brief justification for each pick and create list and save to local
 ```
-Given Results by Nexagent
+
+Given Results by Nexagent (JSON Format)
+```json
+{
+  "top_performing_stocks": [
+    {
+      "rank": 1,
+      "name": "Persistent Systems",
+      "ticker": "PERSISTENT.NS",
+      "sector": "Technology",
+      "industry": "Software",
+      "market_cap": "$4.2B",
+      "growth_metrics": {
+        "revenue_growth": "24.3%",
+        "eps_growth": "32.1%",
+        "pe_ratio": 28.5,
+        "roe": "21.4%",
+        "debt_to_equity": 0.12
+      },
+      "technical_indicators": {
+        "rsi": 62,
+        "50day_ma": "Above",
+        "200day_ma": "Above",
+        "volume_trend": "Increasing"
+      },
+      "justification": "Strong revenue growth in enterprise software with expanding profit margins and low debt."
+    },
+    {
+      "rank": 2,
+      "name": "Tata Elxsi",
+      "ticker": "TATAELXSI.NS",
+      "sector": "Technology",
+      "industry": "Design Services",
+      "market_cap": "$5.1B"
+    },
+    {
+      "rank": 3,
+      "name": "Zensar Technologies",
+      "ticker": "ZENSARTECH.NS",
+      "sector": "Technology",
+      "industry": "IT Services",
+      "market_cap": "$1.8B"
+    }
+  ],
+  "sectors_to_research": [
+    "Healthcare",
+    "Renewable Energy",
+    "E-commerce"
+  ],
+  "analysis_date": "2023-06-15"
+}
 ```
-Potential Companies:
 
-Technology (Software, AI, Cybersecurity):
-    Persistent Systems
-    Tata Elxsi
-    Zensar Technologies
+Given Results by Nexagent (Table Format)
+```
++------+------------------------+------------------+-------------+------------------+
+| Rank | Company                | Ticker           | Market Cap  | Key Strength     |
++------+------------------------+------------------+-------------+------------------+
+| 1    | Persistent Systems     | PERSISTENT.NS    | $4.2B       | Revenue Growth   |
+| 2    | Tata Elxsi            | TATAELXSI.NS     | $5.1B       | Design Services  |
+| 3    | Zensar Technologies   | ZENSARTECH.NS    | $1.8B       | IT Services      |
++------+------------------------+------------------+-------------+------------------+
 
-Healthcare:
-    [Need to research specific small- and mid-cap healthcare companies]
-
-Renewable Energy:
-    [Need to research specific small- and mid-cap renewable energy companies]
-
-E-commerce:
-    [Need to research specific small- and mid-cap e-commerce companies]
+Sectors requiring further research:
+- Healthcare
+- Renewable Energy
+- E-commerce
 ```
 ## 🔍 Usage Examples
 
@@ -138,11 +218,11 @@ from nexagent import Nexagent
 
 async def main():
     agent = Nexagent()
-    
+
     # Launch a basic extraction task
     result = await agent.run("Extract all product information from https://example.com/products")
     print(result)
-    
+
     await agent.close()
 
 if __name__ == "__main__":
@@ -157,28 +237,28 @@ from nexagent.tool.enhanced_browser_tool import EnhancedBrowserTool
 
 async def extract_complete_source():
     browser = EnhancedBrowserTool()
-    
+
     try:
         # Enable stealth mode to avoid detection
         await browser.execute(action="stealth_mode", enable=True)
-        
+
         # Use random delays to appear more human-like
         await browser.execute(action="random_delay", min_delay=800, max_delay=2500)
-        
+
         # Extract comprehensive data
         result = await browser.execute(
             action="navigate_and_extract",
             url="https://example.com/complex-site",
             extract_type="comprehensive"  # Use the most thorough extraction mode
         )
-        
+
         # Process and save the results
         import json
         with open("extraction_results.json", "w") as f:
             content = result.output.split("\n\n", 1)[1]  # Skip the success message
             f.write(content)
             print("Extraction complete. Results saved.")
-            
+
     finally:
         await browser.close()
 
@@ -191,15 +271,37 @@ if __name__ == "__main__":
 
 ### Handling Complex Data Structures
 
-Nexagent automatically detects and handles complex data structures:
+Nexagent automatically detects and handles complex data structures with enhanced formatting options:
 
 ```python
+# Extract comprehensive data
 result = await browser.execute(
     action="navigate_and_extract",
     url="https://example.com/complex-data-gallery",
     extract_type="comprehensive",
     timeout=60000  # Allow more time for processing and loading
 )
+
+# Process and format the extracted data for better readability
+from app.tool.data_processor import DataProcessor
+from app.tool.output_formatter import OutputFormatter
+
+# Format as nicely indented JSON
+data_processor = DataProcessor()
+formatted_result = await data_processor.execute(
+    data=result.output,
+    format="json",
+    indent=4,
+    sort_keys=True
+)
+print(formatted_result.output)
+
+# Or format as a readable table
+table_result = await data_processor.execute(
+    data=result.output,
+    format="table"
+)
+print(table_result.output)
 ```
 
 ### Following Complex Structures
@@ -208,24 +310,24 @@ result = await browser.execute(
 async def extract_all_structures(base_url):
     browser = EnhancedBrowserTool()
     all_results = []
-    
+
     try:
         current_url = base_url
         page = 1
-        
+
         while True:
             print(f"Processing structure {page}: {current_url}")
-            
+
             result = await browser.execute(
                 action="navigate_and_extract",
                 url=current_url,
                 extract_type="comprehensive"
             )
-            
+
             # Process this structure's results
             content = json.loads(result.output.split("\n\n", 1)[1])
             all_results.append(content)
-            
+
             # Check for complex structures
             if "complex_structure" in content and content["complex_structure"].get("structureLinks"):
                 # Find the "next" link
@@ -234,7 +336,7 @@ async def extract_all_structures(base_url):
                     if link.get("isNext"):
                         next_link = link["href"]
                         break
-                
+
                 if next_link:
                     current_url = next_link
                     page += 1
@@ -244,10 +346,10 @@ async def extract_all_structures(base_url):
             else:
                 print("No complex structures detected.")
                 break
-    
+
     finally:
         await browser.close()
-    
+
     return all_results
 ```
 

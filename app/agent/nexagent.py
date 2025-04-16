@@ -8,14 +8,14 @@ from pydantic import Field
 
 from app.agent.toolcall import ToolCallAgent
 from app.prompt.nexagent import NEXT_STEP_PROMPT, SYSTEM_PROMPT
-from app.tool import ToolCollection
-from app.tool.persistent_terminate import PersistentTerminate
-from app.tool.enhanced_browser_tool import EnhancedBrowserTool
-from app.tool.file_saver import FileSaver
-from app.tool.python_execute import PythonExecute
-from app.tool.task_analytics import TaskAnalytics
-from app.tool.web_search import WebSearch
-from app.tool.base import ToolResult
+from app.tools import ToolCollection
+from app.tools.persistent_terminate import PersistentTerminate
+from app.tools.enhanced_browser_tool import EnhancedBrowserTool
+from app.tools.file_saver import FileSaver
+from app.tools.code import PythonExecute
+from app.tools.task_analytics import TaskAnalytics
+from app.tools.browser import WebSearch
+from app.tools.base import ToolResult
 
 
 class Nexagent(ToolCallAgent):
@@ -40,6 +40,9 @@ class Nexagent(ToolCallAgent):
 
     # Task history tracking
     task_history: List[Dict] = Field(default_factory=list)
+
+    # Add websocket attribute with default None to prevent attribute errors
+    websocket: Optional[Any] = None
 
     # Add general-purpose tools to the tool collection
     available_tools: ToolCollection = Field(
@@ -72,8 +75,65 @@ class Nexagent(ToolCallAgent):
             # Look for specific items or quantities
             if not any(char.isdigit() or item in prompt.lower() for char in prompt for item in ["item", "product", "list"]):
                 return "Please provide specific items or quantities needed for this task."
-        
+
         return None
+
+    def format_output(self, output: str, is_final_output: bool = False) -> str:
+        """
+        Format the agent's output to ensure it has a clear structure with a final output section.
+
+        Args:
+            output: The raw output from the agent
+            is_final_output: Whether this is the final output to be shown to the user
+
+        Returns:
+            The formatted output
+        """
+        # If this is the final output to be shown to the user, extract just the final output section
+        if is_final_output:
+            # Look for common final output section markers
+            final_output_markers = [
+                "## Final Output",
+                "# Final Output",
+                "### Final Output",
+                "Final Output:",
+                "Final Result:",
+                "Final Answer:"
+            ]
+
+            # Try to find any of the markers in the output
+            for marker in final_output_markers:
+                if marker in output:
+                    # Split the output at the marker and take everything after it
+                    parts = output.split(marker, 1)
+                    if len(parts) > 1:
+                        # Clean up the final output
+                        final_output = parts[1].strip()
+                        # Remove any trailing implementation steps or notes sections
+                        end_markers = ["## Implementation", "## Notes", "## Next Steps", "## References"]
+                        for end_marker in end_markers:
+                            if end_marker in final_output:
+                                final_output = final_output.split(end_marker, 1)[0].strip()
+                        return final_output
+
+            # If no final output section is found, return the original output
+            return output
+
+        # If this is not the final output, ensure it has a clear structure
+        if "## Final Output" not in output and "# Final Output" not in output:
+            # Add a final output section if none exists
+            if "\n\n" in output:
+                # Try to identify the last paragraph as the final output
+                parts = output.split("\n\n")
+                implementation = "\n\n".join(parts[:-1])
+                final_output = parts[-1]
+                return f"## Implementation Steps\n\n{implementation}\n\n## Final Output\n\n{final_output}"
+            else:
+                # If there's no clear structure, wrap the entire output as the final output
+                return f"## Implementation Steps\n\nNo detailed steps provided.\n\n## Final Output\n\n{output}"
+
+        # If it already has a final output section, return as is
+        return output
 
     async def run(self, prompt: str) -> str:
         """Run the agent with the given prompt and track task history."""
@@ -92,6 +152,9 @@ class Nexagent(ToolCallAgent):
 
         result = await super().run(prompt)
         end_time = datetime.now()
+
+        # Format the result to ensure it has a clear structure
+        result = self.format_output(result)
 
         # Record task in history
         self.task_history.append({

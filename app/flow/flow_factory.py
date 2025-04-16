@@ -4,7 +4,18 @@ from app.agent.base import BaseAgent
 from app.flow.base import BaseFlow, FlowType
 from app.flow.parallel import ParallelFlow, ParallelWorkflowFlow
 from app.flow.planning import PlanningFlow
-from app.flow.self_improving import SelfImprovingParallelFlow, SelfImprovingParallelWorkflowFlow
+from app.flow.integrated_flow import IntegratedFlow
+# Import self-improving flows if available
+try:
+    from app.flow.self_improving import SelfImprovingParallelFlow, SelfImprovingParallelWorkflowFlow
+except SyntaxError:
+    # Create stub classes if there's a syntax error
+    class SelfImprovingParallelFlow(ParallelFlow):
+        pass
+
+    class SelfImprovingParallelWorkflowFlow(ParallelWorkflowFlow):
+        pass
+from app.flow.modular_coordination import ModularCoordinationFlow
 
 
 class FlowFactory:
@@ -20,8 +31,10 @@ class FlowFactory:
             FlowType.PLANNING: PlanningFlow,
             FlowType.PARALLEL: ParallelFlow,
             FlowType.PARALLEL_WORKFLOW: ParallelWorkflowFlow,
-            "self_improving_parallel": SelfImprovingParallelFlow,
-            "self_improving_workflow": SelfImprovingParallelWorkflowFlow,
+            FlowType.SELF_IMPROVING_PARALLEL: SelfImprovingParallelFlow,
+            FlowType.SELF_IMPROVING_WORKFLOW: SelfImprovingParallelWorkflowFlow,
+            FlowType.MODULAR_COORDINATION: ModularCoordinationFlow,
+            FlowType.INTEGRATED: IntegratedFlow,
         }
 
         flow_class = flows.get(flow_type)

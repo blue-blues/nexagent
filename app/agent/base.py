@@ -148,7 +148,14 @@ class BaseAgent(BaseModel, ABC):
                 self.state = AgentState.IDLE
                 results.append(f"Terminated: Reached max steps ({self.max_steps})")
 
-        return "\n".join(results) if results else "No steps executed"
+        # Format the final output
+        final_output = "\n".join(results) if results else "No steps executed"
+
+        # If the agent has a format_output method, use it to format the final output
+        if hasattr(self, 'format_output'):
+            return self.format_output(final_output, is_final_output=True)
+
+        return final_output
 
     @abstractmethod
     async def step(self) -> str:

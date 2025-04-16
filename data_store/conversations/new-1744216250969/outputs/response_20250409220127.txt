@@ -1,0 +1,12 @@
+## Implementation Steps
+
+No detailed steps provided.
+
+---
+
+## Final Output
+
+```shell
+['https://www.ndtv.com/world-news/who-gives-elon-musk-emotional-support-hint-its-not-a-robot-8126510', 'https://en.wikipedia.org/wiki/Elon_Musk', 'https://www.tesla.com/elon-musk', 'https://www.forbes.com/profile/elon-musk/', 'https://twitter.com/elonmusk?ref_src=twsrc%5Egoogle%7Ctwcamp%5Eserp%7Ctwgr%5Eauthor']
+```
+Step 2:

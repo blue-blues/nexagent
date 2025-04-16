@@ -5,8 +5,8 @@ base_url = "https://generativelanguage.googleapis.com/v1beta" # API endpoint URL
 api_key = "AIzaSyDaqaJfVTsbdi6wNqM88wjSPHsglATg-Kc"
 max_tokens = 32000                  # Maximum number of tokens in the response
 temperature = 0.0                      # Controls randomness
-allowed_domains = ["example.com", "trusted.org"]  # Allowed domains for ethical scraping
-allowed_content_types = ["text/html", "application/pdf"]  # Permitted content types
+allowed_domains = ["example.com", "trusted.org", "additional-domain1.com", "additional-domain2.com", "additional-domain3.com"]  # Allowed domains for ethical scraping
+allowed_content_types = ["text/html", "application/pdf", "application/json", "application/xml", "application/zip"]  # Permitted content types
 # max_input_tokens = 100000            # Maximum input tokens to use across all requests (set to null or delete this line for unlimited)
 
 
@@ -42,6 +42,20 @@ headless = true  # Run in headless mode by default for scaling
 disable_security = true
 rate_limit = 50  # Maximum requests per second
 respect_robots_txt = true  # Enable robots.txt compliance
+
+# Fallback browser settings
+enable_fallback = true  # Enable automatic fallback to browser-use/web-ui when scraping fails
+max_fallback_attempts = 3  # Maximum number of fallback attempts before giving up
+web_ui_url = "http://localhost:3000"  # URL for the browser-use/web-ui service
+
+# Enhanced web browser settings
+stealth_mode = true  # Enable stealth mode to avoid detection
+random_delay = true  # Enable random delays to appear more human-like
+min_delay = 800  # Minimum delay in milliseconds for random delays
+max_delay = 2500  # Maximum delay in milliseconds for random delays
+user_agent_rotation = true  # Enable user agent rotation
+base_delay = 1.0  # Base delay for exponential backoff retry mechanism
+validation_level = "thorough"  # Default validation level for multi-source validation
 
 # Extra arguments to pass to the browser
 extra_chromium_args = [

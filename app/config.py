@@ -18,25 +18,21 @@ WORKSPACE_ROOT = PROJECT_ROOT / "workspace"
 
 
 class LLMSettings(BaseModel):
-    model: str = Field(..., description="Model name")
-    base_url: str = Field(..., description="API base URL")
-    api_key: str = Field(..., description="API key")
-    max_tokens: int = Field(4096, description="Maximum number of tokens per request")
+    model: str = Field(..., description="LLM model name")
+    api_type: str = Field("google", description="API type (openai, azure, google, ollama)")
+    api_key: str = Field(..., description="API key for the LLM service")
+    api_version: Optional[str] = Field(None, description="API version (required for Azure)")
+    base_url: str = Field(..., description="Base URL for the API")
+    max_tokens: int = Field(1024, description="Maximum tokens in the response")
+    temperature: float = Field(0.7, description="Temperature for sampling")
+    allowed_domains: Optional[List[str]] = Field(None, description="Allowed domains for ethical scraping")
+    allowed_content_types: Optional[List[str]] = Field(None, description="Permitted content types")
     max_input_tokens: Optional[int] = Field(
-        None,
-        description="Maximum input tokens to use across all requests (None for unlimited)",
+        None, description="Maximum input tokens to use across all requests"
     )
-    temperature: float = Field(1.0, description="Sampling temperature")
-    allowed_domains: List[str] = Field(
-        default_factory=list,
-        description="Allowed domains for ethical content collection"
-    )
-    allowed_content_types: List[str] = Field(
-        default_factory=lambda: ["text/html", "application/pdf"],
-        description="Permitted content types for data processing"
-    )
-    api_type: str = Field("openai", description="API type: 'openai', 'azure', 'google', or 'ollama'")
-    api_version: str = Field("", description="API version if needed (e.g., for Azure OpenAI)")
+    api_call_delay: float = Field(1.0, description="Delay between API calls in seconds")
+    python_execute_timeout: int = Field(30, description="Timeout for Python code execution in seconds")
+    bash_timeout: float = Field(120.0, description="Timeout for bash commands in seconds")
 
 
 class ProxySettings(BaseModel):
@@ -70,6 +66,38 @@ class BrowserSettings(BaseModel):
     )
     proxy: Optional[ProxySettings] = Field(
         None, description="Proxy settings for the browser"
+    )
+    # Fallback browser settings
+    enable_fallback: bool = Field(
+        True, description="Whether to enable automatic fallback to browser-use/web-ui when scraping fails"
+    )
+    max_fallback_attempts: int = Field(
+        3, description="Maximum number of fallback attempts before giving up"
+    )
+    web_ui_url: str = Field(
+        "http://localhost:3000", description="URL for the browser-use/web-ui service"
+    )
+    # Enhanced web browser settings
+    stealth_mode: bool = Field(
+        True, description="Enable stealth mode to avoid detection"
+    )
+    random_delay: bool = Field(
+        True, description="Enable random delays to appear more human-like"
+    )
+    min_delay: int = Field(
+        800, description="Minimum delay in milliseconds for random delays"
+    )
+    max_delay: int = Field(
+        2500, description="Maximum delay in milliseconds for random delays"
+    )
+    user_agent_rotation: bool = Field(
+        True, description="Enable user agent rotation"
+    )
+    base_delay: float = Field(
+        1.0, description="Base delay for exponential backoff retry mechanism"
+    )
+    validation_level: str = Field(
+        "thorough", description="Default validation level for multi-source validation"
     )
 
 
@@ -110,14 +138,9 @@ class Config:
     def _get_config_path() -> Path:
         root = PROJECT_ROOT
         config_path = root / "config" / "config.toml"
-        # Check for absolute path first (for the specified path)
-        absolute_path = Path("D:/code/manus/OpenManus/nexagent/config/config.toml")
-        if absolute_path.exists():
-            logger.info(f"Loading configuration from absolute path: {absolute_path}")
-            return absolute_path
-        # Fall back to relative path
+        # Use the current working directory path instead of hardcoded absolute path
         if config_path.exists():
-            logger.info(f"Loading configuration from relative path: {config_path}")
+            logger.info(f"Loading configuration from path: {config_path}")
             return config_path
         example_path = root / "config" / "config.example.toml"
         if example_path.exists():
@@ -158,6 +181,8 @@ class Config:
             "temperature": base_llm.get("temperature", 1.0),
             "api_type": base_llm.get("api_type", "openai"),
             "api_version": base_llm.get("api_version", ""),
+            "api_call_delay": base_llm.get("api_call_delay", 1.0),
+            "bash_timeout": base_llm.get("bash_timeout", 300.0),
         }
 
         # handle browser config.

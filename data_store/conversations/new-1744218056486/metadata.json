@@ -1,0 +1,29 @@
+{
+  "id": "new-1744218056486",
+  "title": "Conversation new-1744218056486",
+  "created_at": "2025-04-09T22:31:01.457028",
+  "updated_at": "2025-04-09T22:35:55.439237",
+  "outputs": [
+    {
+      "name": "direct_response_20250409223101.txt",
+      "original_name": "direct_response.txt",
+      "type": "document",
+      "path": "D:\\code\\manus\\OpenManus\\nexagent\\data_store\\conversations\\new-1744218056486\\outputs\\direct_response_20250409223101.txt",
+      "added_at": "2025-04-09T22:31:01.471015"
+    },
+    {
+      "name": "direct_response_20250409223111.txt",
+      "original_name": "direct_response.txt",
+      "type": "document",
+      "path": "D:\\code\\manus\\OpenManus\\nexagent\\data_store\\conversations\\new-1744218056486\\outputs\\direct_response_20250409223111.txt",
+      "added_at": "2025-04-09T22:31:11.564057"
+    },
+    {
+      "name": "direct_response_20250409223555.txt",
+      "original_name": "direct_response.txt",
+      "type": "document",
+      "path": "D:\\code\\manus\\OpenManus\\nexagent\\data_store\\conversations\\new-1744218056486\\outputs\\direct_response_20250409223555.txt",
+      "added_at": "2025-04-09T22:35:55.439237"
+    }
+  ]
+}

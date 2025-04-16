@@ -152,15 +152,21 @@ class StrReplaceEditor(BaseTool):
                 raise ToolError(
                     f"The path {path} is not an absolute path, it should start with `/`. Maybe you meant {suggested_path}?"
                 )
-        # Check if path exists
-        if not path.exists() and command != "create":
+        
+        # For create command, we only need to check if the file already exists
+        if command == "create":
+            if path.exists():
+                raise ToolError(
+                    f"File already exists at: {path}. Cannot overwrite files using command `create`."
+                )
+            return
+            
+        # Check if path exists for other commands
+        if not path.exists():
             raise ToolError(
                 f"The path {path} does not exist. Please provide a valid path."
             )
-        if path.exists() and command == "create":
-            raise ToolError(
-                f"File already exists at: {path}. Cannot overwrite files using command `create`."
-            )
+            
         # Check if the path points to a directory
         if path.is_dir():
             if command != "view":
@@ -334,8 +340,14 @@ class StrReplaceEditor(BaseTool):
             raise ToolError(f"Ran into {e} while trying to read {path}") from None
 
     def write_file(self, path: Path, file: str):
-        """Write the content of a file to a given path; raise a ToolError if an error occurs."""
+        """Write the content of a file to a given path; raise a ToolError if an error occurs.
+        Creates parent directories if they don't exist.
+        """
         try:
+            # Ensure the directory exists before writing the file
+            directory = path.parent
+            if directory and not directory.exists():
+                directory.mkdir(parents=True, exist_ok=True)
             path.write_text(file)
         except Exception as e:
             raise ToolError(f"Ran into {e} while trying to write to {path}") from None

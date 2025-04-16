@@ -1,0 +1,3 @@
+5 + 5 = 10
+
+This is a simple addition problem. When you add the number 5 to itself, the result is 10.

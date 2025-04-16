@@ -1,0 +1,22 @@
+{
+  "id": "conv_349f7b77_1744131515",
+  "title": "Conversation conv_349f7b77_1744131515",
+  "created_at": "2025-04-08T22:28:38.854585",
+  "updated_at": "2025-04-08T22:29:10.615968",
+  "outputs": [
+    {
+      "name": "direct_response_20250408222838.txt",
+      "original_name": "direct_response.txt",
+      "type": "document",
+      "path": "D:\\code\\manus\\OpenManus\\nexagent\\data_store\\conversations\\conv_349f7b77_1744131515\\outputs\\direct_response_20250408222838.txt",
+      "added_at": "2025-04-08T22:28:38.864585"
+    },
+    {
+      "name": "response_20250408222910.txt",
+      "original_name": "response.txt",
+      "type": "document",
+      "path": "D:\\code\\manus\\OpenManus\\nexagent\\data_store\\conversations\\conv_349f7b77_1744131515\\outputs\\response_20250408222910.txt",
+      "added_at": "2025-04-08T22:29:10.615968"
+    }
+  ]
+}

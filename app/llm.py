@@ -36,6 +36,19 @@ from app.schema import (
 REASONING_MODELS = ["o1", "o3-mini"]
 
 
+def get_llm(config_name: str = "default"):
+    """
+    Get an instance of the LLM class.
+
+    Args:
+        config_name: The name of the LLM configuration to use
+
+    Returns:
+        An instance of the LLM class
+    """
+    return LLM(config_name=config_name)
+
+
 class LLM:
     _instances: Dict[str, "LLM"] = {}
 
@@ -71,7 +84,7 @@ class LLM:
                 if hasattr(llm_config, "max_input_tokens")
                 else None
             )
-            
+
             # Add API call delay configuration
             self.api_call_delay = getattr(llm_config, "api_call_delay", 1.0)  # Default 1 second delay
             self.last_api_call_time = 0.0  # Track the last API call time
@@ -103,10 +116,10 @@ class LLM:
     def validate_request_ethics(self, url: str, content_type: str):
         """Validate if a request meets ethical scraping criteria."""
         from urllib.parse import urlparse
-        
+
         parsed_url = urlparse(url)
         domain = parsed_url.netloc
-        
+
         if self.allowed_domains and domain not in self.allowed_domains:
             raise ValueError(f"Domain {domain} not in allowed list")
         if content_type not in self.allowed_content_types:
@@ -229,6 +242,73 @@ class LLM:
                 raise ValueError(f"Invalid role: {msg['role']}")
 
         return formatted_messages
+
+    @retry(
+        wait=wait_random_exponential(min=1, max=60),
+        stop=stop_after_attempt(6),
+        retry=retry_if_exception_type(
+            (OpenAIError, Exception, ValueError)
+        ),  # Don't retry TokenLimitExceeded
+    )
+    async def chat(
+        self,
+        messages: List[dict],
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+    ):
+        """
+        Send a chat request to the LLM and get the response.
+
+        Args:
+            messages: List of messages in the format [{"role": "system", "content": "..."}, {"role": "user", "content": "..."}]
+            temperature: Sampling temperature for the response
+            max_tokens: Maximum number of tokens to generate
+
+        Returns:
+            The model's response object
+        """
+        try:
+            # Calculate input token count
+            input_tokens = self.count_message_tokens(messages)
+
+            # Check if token limits are exceeded
+            if not self.check_token_limit(input_tokens):
+                error_message = self.get_limit_error_message(input_tokens)
+                # Raise a special exception that won't be retried
+                raise TokenLimitExceeded(error_message)
+
+            # Set up the completion request
+            params = {
+                "model": self.model,
+                "messages": messages,
+            }
+
+            if self.model in REASONING_MODELS:
+                params["max_completion_tokens"] = max_tokens or self.max_tokens
+            else:
+                params["max_tokens"] = max_tokens or self.max_tokens
+                params["temperature"] = temperature if temperature is not None else self.temperature
+
+            # Make the API call
+            response = await self.client.chat.completions.create(**params)
+
+            # Update token counts
+            self.update_token_count(response.usage.prompt_tokens)
+
+            return response.choices[0].message
+
+        except TokenLimitExceeded:
+            # Re-raise token limit errors without logging
+            raise
+        except ValueError as ve:
+            logger.error(f"Validation error in chat: {ve}")
+            raise
+        except OpenAIError as oe:
+            logger.error(f"OpenAI API error in chat: {oe}")
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error in chat: {e}")
+            raise
 
     @retry(
         wait=wait_random_exponential(min=1, max=60),
