@@ -84,24 +84,7 @@ python main_cli.py
 > Enter prompt <
 ```
 
-### Web Interface Mode
-
-```bash
-# Run with web interface
-python main.py
-```
-
-### API Server Mode
-
-```bash
-# Run as API server (basic version)
-python run_api_server.py
-
-# Run as API server with conversation organization features
-python run_api_server_with_organization.py
-```
-
-For more details on the API server, see [README_API_SERVER.md](README_API_SERVER.md).
+Nexagent now operates exclusively through a command-line interface for improved performance and reliability. The web interface has been removed in favor of a more streamlined terminal-based experience.
 
 
 ## ⚙️ Configuration

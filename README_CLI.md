@@ -19,8 +19,14 @@ python main_cli.py
 
 ### Available Commands
 - Type your query and press Enter to interact with the AI
-- Type `stats` to see routing statistics
 - Type `exit` to quit the application
+- Type `stats` to see performance statistics and routing information
+- Type `feedback` to provide feedback on the last response
+- Type `save` to save the learning system state
+- Type `mode [chat|agent|auto]` to set the processing mode:
+  - `mode chat`: Use chat mode for direct LLM responses
+  - `mode agent`: Use agent mode for tool-assisted responses
+  - `mode auto`: Automatically detect the appropriate mode (default)
 
 ## Core Functionality
 The CLI version preserves all the core functionality of NexAgent:
