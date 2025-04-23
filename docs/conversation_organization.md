@@ -45,49 +45,7 @@ data_store/
       {title}_summary.pdf # PDF summary (if PDF generation is successful)
 ```
 
-## API Endpoints
 
-The server provides the following API endpoints for managing conversations and materials:
-
-### Process Message
-
-```
-POST /api/message
-```
-
-Process a user message and get a response from the assistant. This automatically creates a conversation folder if it doesn't exist, saves the messages, and generates an output document.
-
-### Get Conversations
-
-```
-GET /api/conversations
-```
-
-Get a list of all conversations.
-
-### Get Conversation
-
-```
-GET /api/conversations/{conversation_id}
-```
-
-Get details of a specific conversation.
-
-### Save Material
-
-```
-POST /api/materials
-```
-
-Save a material to a conversation folder.
-
-### Generate Output
-
-```
-POST /api/generate-output
-```
-
-Generate a final output document for a conversation.
 
 ## Dependencies
 

@@ -50,8 +50,13 @@ class WebSearch(BaseTool):
         # Add Brave search engine if available
         if BraveSearchEngine is not None:
             try:
-                self._search_engine["brave"] = BraveSearchEngine()
-                logger.info("Brave search engine added to WebSearch tool")
+                brave_engine = BraveSearchEngine()
+                # Only add if API key is available
+                if brave_engine.api_key:
+                    self._search_engine["brave"] = brave_engine
+                    logger.info("Brave search engine added to WebSearch tool")
+                else:
+                    logger.warning("Brave search engine not added: API key not found")
             except Exception as e:
                 logger.error(f"Error initializing Brave search engine: {str(e)}")
 

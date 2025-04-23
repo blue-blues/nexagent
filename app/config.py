@@ -43,6 +43,17 @@ class ProxySettings(BaseModel):
 
 class SearchSettings(BaseModel):
     engine: str = Field(default="Google", description="Search engine the llm to use")
+    brave_api_key: Optional[str] = Field(None, description="API key for Brave Search")
+
+
+class FileAttachmentSettings(BaseModel):
+    max_file_size: int = Field(10485760, description="Maximum file size in bytes (10MB)")
+    allowed_extensions: List[str] = Field(
+        default_factory=lambda: [".txt", ".pdf", ".docx", ".xlsx", ".csv", ".json", ".xml", ".html", ".md", ".py", ".js", ".ts", ".jpg", ".jpeg", ".png", ".gif"],
+        description="List of allowed file extensions"
+    )
+    scan_for_malware: bool = Field(True, description="Whether to scan uploaded files for malware")
+    process_content: bool = Field(True, description="Whether to process the content of the file")
 
 
 class BrowserSettings(BaseModel):
@@ -108,6 +119,9 @@ class AppConfig(BaseModel):
     )
     search_config: Optional[SearchSettings] = Field(
         None, description="Search configuration"
+    )
+    file_attachment_config: Optional[FileAttachmentSettings] = Field(
+        None, description="File attachment configuration"
     )
 
     class Config:
@@ -223,6 +237,12 @@ class Config:
         if search_config:
             search_settings = SearchSettings(**search_config)
 
+        # Load file attachment settings
+        file_attachment_config = raw_config.get("file_attachment", {})
+        file_attachment_settings = None
+        if file_attachment_config:
+            file_attachment_settings = FileAttachmentSettings(**file_attachment_config)
+
         config_dict = {
             "llm": {
                 "default": default_settings,
@@ -233,6 +253,7 @@ class Config:
             },
             "browser_config": browser_settings,
             "search_config": search_settings,
+            "file_attachment_config": file_attachment_settings,
         }
 
         self._config = AppConfig(**config_dict)
@@ -248,6 +269,10 @@ class Config:
     @property
     def search_config(self) -> Optional[SearchSettings]:
         return self._config.search_config
+
+    @property
+    def file_attachment_config(self) -> Optional[FileAttachmentSettings]:
+        return self._config.file_attachment_config
 
 
 config = Config()

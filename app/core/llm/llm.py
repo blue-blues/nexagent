@@ -1,6 +1,15 @@
-from typing import Dict, List, Optional, Union
+"""
+LLM Interface Module
+
+This module provides a unified interface for interacting with various LLM providers.
+It abstracts away the differences between different LLM APIs and provides a consistent
+interface for the rest of the application.
+"""
+
+from typing import Dict, List, Optional, Union, Any, Protocol, AsyncGenerator
 import asyncio
 import time
+from abc import ABC, abstractmethod
 
 import tiktoken
 import aiohttp
@@ -20,17 +29,18 @@ from tenacity import (
     wait_random_exponential,
 )
 
-from app.config import LLMSettings, config
-from app.exceptions import TokenLimitExceeded
-from app.google_llm import GoogleGenerativeAIClient
-from app.logger import logger  # Assuming a logger is set up in your app
-from app.schema import (
+from app.core.schema.schema import (
     ROLE_VALUES,
     TOOL_CHOICE_TYPE,
     TOOL_CHOICE_VALUES,
     Message,
     ToolChoice,
+    LLMSettings,
 )
+from app.core.schema.exceptions import TokenLimitExceeded
+from app.core.config.config import config
+from app.core.llm.google_llm import GoogleGenerativeAIClient
+from app.utils.logging.logger import logger
 
 
 REASONING_MODELS = ["o1", "o3-mini"]
@@ -52,12 +62,22 @@ class LLM:
         self, config_name: str = "default", llm_config: Optional[LLMSettings] = None
     ):
         if not hasattr(self, "client"):  # Only initialize if not already initialized
-            llm_config = llm_config or config.llm
-            llm_config = llm_config.get(config_name, llm_config["default"])
+            # Use provided config or get from global config
+            if llm_config is None:
+                # Check if config.llm is a dict (old format) or LLMSettings (new format)
+                if isinstance(config.llm, dict):
+                    # Old format - dictionary with nested configs
+                    llm_config_dict = config.llm.get(config_name, config.llm.get("default", {}))
+                    llm_config = LLMSettings(**llm_config_dict)
+                else:
+                    # New format - direct LLMSettings object
+                    llm_config = config.llm
+
+            # Set attributes from config
             self.model = llm_config.model
             self.max_tokens = llm_config.max_tokens
             self.temperature = llm_config.temperature
-            self.api_type = llm_config.api_type
+            self.api_type = getattr(llm_config, "api_type", "openai")
             self.api_key = llm_config.api_key
             self.api_version = llm_config.api_version
             self.base_url = llm_config.base_url
@@ -71,7 +91,7 @@ class LLM:
                 if hasattr(llm_config, "max_input_tokens")
                 else None
             )
-            
+
             # Add API call delay configuration
             self.api_call_delay = getattr(llm_config, "api_call_delay", 1.0)  # Default 1 second delay
             self.last_api_call_time = 0.0  # Track the last API call time
@@ -103,10 +123,10 @@ class LLM:
     def validate_request_ethics(self, url: str, content_type: str):
         """Validate if a request meets ethical scraping criteria."""
         from urllib.parse import urlparse
-        
+
         parsed_url = urlparse(url)
         domain = parsed_url.netloc
-        
+
         if self.allowed_domains and domain not in self.allowed_domains:
             raise ValueError(f"Domain {domain} not in allowed list")
         if content_type not in self.allowed_content_types:

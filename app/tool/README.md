@@ -15,7 +15,7 @@ This module contains all the tools used by the Nexagent system. Tools are organi
 - `browser_use_tool.py` - Basic browser functionality
 - `enhanced_browser_tool.py` - Enhanced browser with additional features
 - `fallback_browser_tool.py` - Fallback browser when primary browser fails
-- `web_ui_browser_tool.py` - Browser for web UI interactions
+
 - `web_search.py` - Web search functionality
 
 ### File and Data Tools
@@ -30,7 +30,7 @@ This module contains all the tools used by the Nexagent system. Tools are organi
 
 ### Management Tools
 - `conversation_manager.py` - Manage conversations
-- `mcp_server.py` - Master Control Program server for data management
+
 - `planning.py` - Planning functionality
 - `terminate.py` - Terminate functionality
 - `persistent_terminate.py` - Persistent terminate functionality

@@ -1033,6 +1033,548 @@ class PlanningTool(BaseTool):
             output=f"Merged version '{version_id}' with '{compare_with_version}' using {merge_strategy} strategy.\n\nNew version created: {merge_version_id}\n\n{self._format_detailed_plan(merged_plan)}"
         )
 
+    def _validate_plan(self, plan_id: Optional[str]) -> ToolResult:
+        """Validate a plan for logical errors, dependency issues, and resource requirements."""
+        if not plan_id:
+            return ToolResult(error="Plan ID is required for validate_plan command")
+
+        if plan_id not in self.plans:
+            return ToolResult(error=f"Plan with ID '{plan_id}' not found")
+
+        plan = self.plans[plan_id]
+        steps = plan.get("steps", [])
+        dependencies = plan.get("step_dependencies", [])
+
+        if not steps:
+            return ToolResult(output=f"Plan '{plan_id}' has no steps to validate")
+
+        # Initialize validation results with categories
+        validation_results = {
+            "structure": {"issues": [], "warnings": [], "suggestions": [], "score": 100},
+            "content": {"issues": [], "warnings": [], "suggestions": [], "score": 100},
+            "dependencies": {"issues": [], "warnings": [], "suggestions": [], "score": 100},
+            "resources": {"issues": [], "warnings": [], "suggestions": [], "score": 100},
+            "logic": {"issues": [], "warnings": [], "suggestions": [], "score": 100}
+        }
+
+        # Consolidated lists for final output
+        validation_issues = []
+        warnings = []
+        suggestions = []
+
+        # 1. Basic structure validation checks
+        if not plan.get("title"):
+            validation_results["structure"]["issues"].append("Plan is missing a title")
+            validation_results["structure"]["score"] -= 20
+
+        if not plan.get("description"):
+            validation_results["structure"]["warnings"].append("Plan is missing a description")
+            validation_results["structure"]["score"] -= 10
+            validation_results["structure"]["suggestions"].append("Add a clear description that outlines the plan's purpose and goals")
+
+        if len(steps) < 2:
+            validation_results["structure"]["issues"].append("Plan has too few steps (minimum 2 recommended)")
+            validation_results["structure"]["score"] -= 30
+            validation_results["structure"]["suggestions"].append("Break down the task into more detailed steps")
+
+        # 2. Step content validation
+        vague_terms = ["do", "handle", "process", "manage", "work on", "deal with"]
+        action_verbs = ["create", "implement", "develop", "design", "build", "test", "deploy", "analyze", "review"]
+
+        # Track step verbs to detect repetitive patterns
+        step_verbs = []
+
+        for i, step in enumerate(steps):
+            # Extract the first word (likely a verb)
+            words = step.strip().split()
+            first_word = words[0].lower() if words else ""
+            if first_word:
+                step_verbs.append(first_word)
+
+            if not step.strip():
+                validation_results["content"]["issues"].append(f"Step {i+1} is empty")
+                validation_results["content"]["score"] -= 15
+            elif len(words) < 3:
+                validation_results["content"]["warnings"].append(f"Step {i+1} may be too brief: '{step}'")
+                validation_results["content"]["score"] -= 5
+                validation_results["content"]["suggestions"].append(f"Expand step {i+1} with more details about how to accomplish it")
+            elif any(term in step.lower() for term in vague_terms):
+                validation_results["content"]["warnings"].append(f"Step {i+1} contains vague language: '{step}'")
+                validation_results["content"]["score"] -= 5
+                validation_results["content"]["suggestions"].append(f"Make step {i+1} more specific and actionable")
+
+            # Check if step starts with an action verb
+            if first_word and first_word not in action_verbs:
+                validation_results["content"]["warnings"].append(f"Step {i+1} may not start with a clear action verb: '{step}'")
+                validation_results["content"]["suggestions"].append(f"Start step {i+1} with an action verb like 'Create', 'Implement', etc.")
+                validation_results["content"]["score"] -= 3
+
+        # Check for repetitive step patterns
+        if len(step_verbs) >= 3:
+            verb_counts = {}
+            for verb in step_verbs:
+                verb_counts[verb] = verb_counts.get(verb, 0) + 1
+
+            repetitive_verbs = [v for v, count in verb_counts.items() if count > len(steps) / 3 and len(steps) > 3]
+            if repetitive_verbs:
+                validation_results["content"]["warnings"].append(f"Plan has repetitive step patterns using the same verbs: {', '.join(repetitive_verbs)}")
+                validation_results["content"]["score"] -= 5
+                validation_results["content"]["suggestions"].append("Use a variety of action verbs to make steps more distinct and specific")
+
+        # 3. Logical error detection in steps
+        # Check for logical ordering issues
+        logical_ordering_terms = {
+            "prerequisites": ["install", "setup", "configure", "prepare"],
+            "implementation": ["implement", "develop", "code", "create", "build"],
+            "testing": ["test", "verify", "validate", "check"],
+            "deployment": ["deploy", "release", "publish", "distribute"]
+        }
+
+        step_categories = []
+        for step in steps:
+            step_lower = step.lower()
+            assigned_category = None
+
+            for category, terms in logical_ordering_terms.items():
+                if any(term in step_lower for term in terms):
+                    assigned_category = category
+                    break
+
+            step_categories.append(assigned_category)
+
+        # Check for logical ordering violations
+        expected_order = ["prerequisites", "implementation", "testing", "deployment"]
+        last_category_index = -1
+
+        for i, category in enumerate(step_categories):
+            if category is None:
+                continue
+
+            expected_index = expected_order.index(category) if category in expected_order else -1
+            if expected_index != -1 and expected_index < last_category_index:
+                validation_results["logic"]["issues"].append(f"Logical ordering issue: Step {i+1} ({category}) appears after {expected_order[last_category_index]}")
+                validation_results["logic"]["score"] -= 10
+                validation_results["logic"]["suggestions"].append(f"Consider moving step {i+1} earlier in the plan")
+
+            if expected_index > last_category_index:
+                last_category_index = expected_index
+
+        # 4. Dependency validation
+        # Build dependency graph
+        graph = {i: [] for i in range(len(steps))}
+        reverse_graph = {i: [] for i in range(len(steps))}
+
+        # Check for invalid dependencies
+        invalid_deps = []
+        for dep in dependencies:
+            if len(dep) != 2:
+                invalid_deps.append(f"Dependency {dep} has invalid format")
+                validation_results["dependencies"]["score"] -= 10
+            elif not (0 <= dep[0] < len(steps) and 0 <= dep[1] < len(steps)):
+                invalid_deps.append(f"Dependency {dep} references non-existent steps")
+                validation_results["dependencies"]["score"] -= 10
+            else:
+                graph[dep[0]].append(dep[1])  # Step dep[0] depends on step dep[1]
+                reverse_graph[dep[1]].append(dep[0])  # Step dep[1] is depended on by step dep[0]
+
+        if invalid_deps:
+            validation_results["dependencies"]["issues"].extend(invalid_deps)
+
+        # Find root steps (no dependencies)
+        root_steps = [i for i in range(len(steps)) if not graph[i]]
+
+        # Find leaf steps (no dependents)
+        leaf_steps = [i for i in range(len(steps)) if not reverse_graph[i]]
+
+        # Check for cycles
+        visited = set()
+        temp_visited = set()
+        has_cycle = False
+        cycle_path = []
+
+        def dfs(node, path):
+            nonlocal has_cycle, cycle_path
+            if node in temp_visited:
+                has_cycle = True
+                cycle_path = path + [node]
+                return
+            if node in visited:
+                return
+
+            temp_visited.add(node)
+            path.append(node)
+
+            for neighbor in graph[node]:
+                dfs(neighbor, path)
+                if has_cycle:
+                    return
+
+            path.pop()
+            temp_visited.remove(node)
+            visited.add(node)
+
+        for i in range(len(steps)):
+            if i not in visited:
+                dfs(i, [])
+                if has_cycle:
+                    break
+
+        if has_cycle:
+            cycle_desc = " -> ".join([f"Step {i+1} ({steps[i]})" for i in cycle_path])
+            validation_results["dependencies"]["issues"].append(f"Dependency cycle detected: {cycle_desc}")
+            validation_results["dependencies"]["score"] -= 30
+            validation_results["dependencies"]["suggestions"].append("Resolve the dependency cycle by restructuring steps")
+
+        # Check for disconnected steps
+        if len(root_steps) == 0:
+            validation_results["dependencies"]["issues"].append("Plan has no starting steps (all steps have dependencies)")
+            validation_results["dependencies"]["score"] -= 20
+            validation_results["dependencies"]["suggestions"].append("Add at least one step that can start without dependencies")
+
+        if len(leaf_steps) == 0:
+            validation_results["dependencies"]["issues"].append("Plan has no ending steps (all steps are depended upon)")
+            validation_results["dependencies"]["score"] -= 20
+            validation_results["dependencies"]["suggestions"].append("Add at least one final step that no other steps depend on")
+
+        # Check for missing logical dependencies
+        for i, step_i in enumerate(steps):
+            step_i_lower = step_i.lower()
+            for j, step_j in enumerate(steps):
+                if i == j:
+                    continue
+
+                step_j_lower = step_j.lower()
+
+                # Check for logical dependencies based on content
+                if any(f"step {j+1}" in step_i_lower or f"task {j+1}" in step_i_lower):
+                    if j not in graph[i] and i not in reverse_graph[j]:
+                        validation_results["dependencies"]["warnings"].append(f"Step {i+1} references Step {j+1} but has no dependency relationship")
+                        validation_results["dependencies"]["score"] -= 5
+                        validation_results["dependencies"]["suggestions"].append(f"Add a dependency between Step {i+1} and Step {j+1}")
+
+        # 5. Resource requirement validation
+        resource_terms = ["requires", "need", "using", "with", "resource", "tool", "library", "framework", "database"]
+        common_resources = ["memory", "cpu", "storage", "bandwidth", "time", "budget", "personnel"]
+
+        # Track mentioned resources
+        mentioned_resources = set()
+        resource_steps = {}
+
+        for i, step in enumerate(steps):
+            step_lower = step.lower()
+            step_resources = []
+
+            # Check for resource mentions
+            if any(term in step_lower for term in resource_terms):
+                # Try to identify specific resources
+                for resource in common_resources:
+                    if resource in step_lower:
+                        step_resources.append(resource)
+                        mentioned_resources.add(resource)
+
+                if not step_resources:
+                    validation_results["resources"]["warnings"].append(f"Step {i+1} may have implicit resource requirements: '{step}'")
+                    validation_results["resources"]["score"] -= 5
+                    validation_results["resources"]["suggestions"].append(f"Specify required resources for step {i+1}")
+                else:
+                    resource_steps[i] = step_resources
+
+        # Check for resource conflicts
+        if len(resource_steps) >= 2:
+            for (i, res_i), (j, res_j) in [(a, b) for idx, a in enumerate(resource_steps.items())
+                                           for b in list(resource_steps.items())[idx+1:]]:
+                common_res = set(res_i).intersection(set(res_j))
+                if common_res and i != j:
+                    # Check if these steps could run in parallel (no dependency between them)
+                    if j not in graph[i] and i not in graph[j]:
+                        validation_results["resources"]["warnings"].append(
+                            f"Potential resource conflict: Steps {i+1} and {j+1} both use {', '.join(common_res)} and could run in parallel")
+                        validation_results["resources"]["score"] -= 5
+                        validation_results["resources"]["suggestions"].append(
+                            f"Either add a dependency between Steps {i+1} and {j+1} or ensure resources are sufficient for parallel execution")
+
+        # 6. Calculate final health scores
+        for category in validation_results:
+            # Ensure score is between 0 and 100
+            validation_results[category]["score"] = max(0, min(100, validation_results[category]["score"]))
+
+            # Add category issues, warnings, and suggestions to consolidated lists
+            validation_issues.extend([(category, issue) for issue in validation_results[category]["issues"]])
+            warnings.extend([(category, warning) for warning in validation_results[category]["warnings"]])
+            suggestions.extend([(category, suggestion) for suggestion in validation_results[category]["suggestions"]])
+
+        # Calculate overall health score (weighted average)
+        weights = {"structure": 0.15, "content": 0.2, "dependencies": 0.3, "resources": 0.15, "logic": 0.2}
+        overall_score = sum(validation_results[cat]["score"] * weights[cat] for cat in validation_results)
+        overall_score = round(overall_score, 1)  # Round to 1 decimal place
+
+        health_rating = "Excellent" if overall_score >= 90 else "Good" if overall_score >= 75 else "Fair" if overall_score >= 50 else "Poor"
+
+        # Format the validation report
+        output = f"Plan Validation Report for '{plan_id}':\n\n"
+        output += f"Overall Health Score: {overall_score}/100 ({health_rating})\n\n"
+
+        # Add category scores
+        output += "Category Scores:\n"
+        for category, data in validation_results.items():
+            category_rating = "Excellent" if data["score"] >= 90 else "Good" if data["score"] >= 75 else "Fair" if data["score"] >= 50 else "Poor"
+            output += f"- {category.capitalize()}: {data['score']}/100 ({category_rating})\n"
+        output += "\n"
+
+        if validation_issues:
+            output += "Critical Issues:\n"
+            for category, issue in validation_issues:
+                output += f"❌ [{category.capitalize()}] {issue}\n"
+            output += "\n"
+
+        if warnings:
+            output += "Warnings:\n"
+            for category, warning in warnings:
+                output += f"⚠️ [{category.capitalize()}] {warning}\n"
+            output += "\n"
+
+        if suggestions:
+            output += "Suggestions for Improvement:\n"
+            for category, suggestion in suggestions:
+                output += f"💡 [{category.capitalize()}] {suggestion}\n"
+            output += "\n"
+
+        # Add dependency analysis summary
+        output += "Dependency Analysis:\n"
+        output += f"- Starting steps: {len(root_steps)}\n"
+        output += f"- Ending steps: {len(leaf_steps)}\n"
+        output += f"- Dependency relationships: {len(dependencies)}\n"
+        if has_cycle:
+            output += f"- Dependency cycles: Yes (critical issue)\n"
+        else:
+            output += f"- Dependency cycles: None\n"
+        output += "\n"
+
+        # Add resource analysis if resources were detected
+        if mentioned_resources:
+            output += "Resource Analysis:\n"
+            output += f"- Detected resources: {', '.join(mentioned_resources)}\n"
+            output += f"- Steps with explicit resource requirements: {len(resource_steps)}\n"
+            output += "\n"
+
+        # Store validation results in plan metadata for future reference
+        if "metadata" not in plan:
+            plan["metadata"] = {}
+        if "validation" not in plan["metadata"]:
+            plan["metadata"]["validation"] = {}
+
+        plan["metadata"]["validation"] = {
+            "timestamp": datetime.datetime.now().isoformat(),
+            "overall_score": overall_score,
+            "health_rating": health_rating,
+            "category_scores": {cat: data["score"] for cat, data in validation_results.items()},
+            "issues": validation_issues,
+            "warnings": warnings,
+            "suggestions": suggestions,
+            "has_dependency_cycle": has_cycle,
+            "detected_resources": list(mentioned_resources) if mentioned_resources else []
+        }
+
+        return ToolResult(output=output)
+
+    def _optimize_plan(self, plan_id: Optional[str]) -> ToolResult:
+        """Optimize a plan by suggesting improvements and automatically fixing issues."""
+        if not plan_id:
+            return ToolResult(error="Plan ID is required for optimize_plan command")
+
+        if plan_id not in self.plans:
+            return ToolResult(error=f"Plan with ID '{plan_id}' not found")
+
+        plan = self.plans[plan_id]
+        steps = plan.get("steps", [])
+        dependencies = plan.get("step_dependencies", [])
+
+        if not steps:
+            return ToolResult(output=f"Plan '{plan_id}' has no steps to optimize")
+
+        # First, validate the plan to identify issues
+        validation_result = self._validate_plan(plan_id)
+
+        # Check if validation found critical issues
+        has_critical_issues = False
+        if "metadata" in plan and "validation" in plan["metadata"]:
+            has_critical_issues = len(plan["metadata"]["validation"].get("issues", [])) > 0
+
+        # Initialize optimization results
+        optimizations_applied = []
+        optimization_suggestions = []
+
+        # Create a copy of the plan to apply optimizations
+        optimized_plan = copy.deepcopy(plan)
+        optimized_steps = optimized_plan["steps"]
+        optimized_dependencies = optimized_plan["step_dependencies"]
+
+        # 1. Fix dependency cycles if present
+        if plan["metadata"].get("validation", {}).get("has_dependency_cycle", False):
+            # Build dependency graph
+            graph = {i: [] for i in range(len(steps))}
+            for dep in dependencies:
+                if len(dep) == 2 and 0 <= dep[0] < len(steps) and 0 <= dep[1] < len(steps):
+                    graph[dep[0]].append(dep[1])
+
+            # Find and break cycles
+            visited = set()
+            temp_visited = set()
+            cycle_edges = []
+
+            def find_cycle_edges(node, path):
+                if node in temp_visited:
+                    # Found a cycle, identify the edge to remove
+                    cycle_start = path.index(node)
+                    cycle = path[cycle_start:] + [node]
+                    # Choose the edge with the highest weight to break
+                    # For simplicity, we'll just choose the last edge in the cycle
+                    cycle_edges.append((cycle[-2], cycle[-1]))
+                    return True
+                if node in visited:
+                    return False
+
+                temp_visited.add(node)
+                path.append(node)
+
+                for neighbor in graph[node]:
+                    if find_cycle_edges(neighbor, path):
+                        return True
+
+                path.pop()
+                temp_visited.remove(node)
+                visited.add(node)
+                return False
+
+            for i in range(len(steps)):
+                if i not in visited and i not in temp_visited:
+                    temp_visited = set()
+                    find_cycle_edges(i, [])
+
+            # Remove edges to break cycles
+            for edge in cycle_edges:
+                source, target = edge
+                if [source, target] in optimized_dependencies:
+                    optimized_dependencies.remove([source, target])
+                    optimizations_applied.append(f"Removed dependency from Step {source+1} to Step {target+1} to break cycle")
+
+        # 2. Improve step descriptions
+        vague_terms = ["do", "handle", "process", "manage", "work on", "deal with"]
+        for i, step in enumerate(optimized_steps):
+            # Check for vague language
+            if any(term in step.lower() for term in vague_terms):
+                # Suggest a more specific step description
+                suggestion = f"Make Step {i+1} more specific: '{step}' → 'Specifically [action] [object] by [method]'"
+                optimization_suggestions.append(suggestion)
+
+            # Check for very short steps
+            if len(step.split()) < 3:
+                suggestion = f"Expand Step {i+1} with more details: '{step}' → '{step} by [specific method/approach]'"
+                optimization_suggestions.append(suggestion)
+
+        # 3. Optimize dependency structure
+        # Check for missing dependencies between related steps
+        for i, step_i in enumerate(optimized_steps):
+            for j, step_j in enumerate(optimized_steps):
+                if i != j and [i, j] not in optimized_dependencies and [j, i] not in optimized_dependencies:
+                    # Look for keyword relationships
+                    step_i_words = set(step_i.lower().split())
+                    step_j_words = set(step_j.lower().split())
+                    common_words = step_i_words.intersection(step_j_words)
+
+                    # If steps share significant words and are adjacent, suggest dependency
+                    if len(common_words) >= 2 and abs(i - j) == 1:
+                        suggestion = f"Consider adding dependency between related Steps {i+1} and {j+1}"
+                        optimization_suggestions.append(suggestion)
+
+        # 4. Check for parallel execution opportunities
+        # Find steps that could be executed in parallel (no dependencies between them)
+        parallel_groups = []
+        dependency_pairs = [[d[0], d[1]] for d in optimized_dependencies]
+
+        for i in range(len(optimized_steps)):
+            group = [i]
+            for j in range(len(optimized_steps)):
+                if i != j and [i, j] not in dependency_pairs and [j, i] not in dependency_pairs:
+                    # Check if j has no dependencies with any step in the group
+                    can_add = True
+                    for k in group:
+                        if [k, j] in dependency_pairs or [j, k] in dependency_pairs:
+                            can_add = False
+                            break
+                    if can_add:
+                        group.append(j)
+            if len(group) > 1:
+                parallel_groups.append(sorted(group))
+
+        # Remove duplicate groups and subgroups
+        unique_groups = []
+        for group in sorted(parallel_groups, key=len, reverse=True):
+            is_unique = True
+            for existing_group in unique_groups:
+                if set(group).issubset(set(existing_group)):
+                    is_unique = False
+                    break
+            if is_unique:
+                unique_groups.append(group)
+
+        if unique_groups:
+            for group in unique_groups:
+                steps_str = ", ".join([f"Step {i+1}" for i in group])
+                suggestion = f"Potential parallel execution: {steps_str}"
+                optimization_suggestions.append(suggestion)
+
+        # 5. Apply optimizations to the plan if changes were made
+        if optimizations_applied:
+            # Update the plan with optimized version
+            self.plans[plan_id] = optimized_plan
+
+            # Create a new version to track the optimization
+            timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+            self._create_version(plan_id, f"v_optimized_{timestamp}", "Automatic optimization")
+
+        # Format the optimization report
+        output = f"Plan Optimization Report for '{plan_id}':\n\n"
+
+        if optimizations_applied:
+            output += "Optimizations Applied:\n"
+            for opt in optimizations_applied:
+                output += f"✅ {opt}\n"
+            output += "\n"
+
+        if optimization_suggestions:
+            output += "Optimization Suggestions:\n"
+            for suggestion in optimization_suggestions:
+                output += f"💡 {suggestion}\n"
+            output += "\n"
+
+        if not optimizations_applied and not optimization_suggestions:
+            output += "No optimizations were identified for this plan.\n\n"
+
+        # Add summary of the optimization
+        output += "Optimization Summary:\n"
+        output += f"- Automatic optimizations applied: {len(optimizations_applied)}\n"
+        output += f"- Manual optimization suggestions: {len(optimization_suggestions)}\n"
+
+        if has_critical_issues:
+            output += "- Critical issues remain that require manual resolution\n"
+        else:
+            output += "- No critical issues detected in the optimized plan\n"
+
+        # Store optimization results in plan metadata
+        if "metadata" not in optimized_plan:
+            optimized_plan["metadata"] = {}
+        if "optimization" not in optimized_plan["metadata"]:
+            optimized_plan["metadata"]["optimization"] = {}
+
+        optimized_plan["metadata"]["optimization"] = {
+            "timestamp": datetime.datetime.now().isoformat(),
+            "optimizations_applied": optimizations_applied,
+            "optimization_suggestions": optimization_suggestions
+        }
+
+        return ToolResult(output=output)
+
     def _analyze_dependencies(self, plan_id: Optional[str]) -> ToolResult:
         """Analyze dependencies between steps in a plan."""
         if not plan_id:

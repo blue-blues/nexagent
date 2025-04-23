@@ -5,7 +5,7 @@ import time
 from io import StringIO
 from typing import Dict, List, Optional, Tuple, Union, ClassVar, Any
 
-from app.tool.base import BaseTool
+from app.tools.base import BaseTool
 from app.logger import logger
 from app.sandbox.code_sandbox import default_code_sandbox
 from app.timeline.timeline import Timeline

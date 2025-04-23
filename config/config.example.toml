@@ -78,9 +78,11 @@ extra_chromium_args = [
 # password = "proxy-password"
 
 # Optional configuration, Search settings.
-# [search]
-# Search engine for agent to use. Default is "Google", can be set to "Baidu" or "DuckDuckGo".
+[search]
+# Search engine for agent to use. Default is "Google", can be set to "Baidu", "DuckDuckGo", or "Brave".
 engine = "Google"
+# API key for Brave Search (required if using Brave as the search engine)
+# brave_api_key = "YOUR_BRAVE_API_KEY"
 
 # [llm] #OPENROUTER:
 # api_type = 'openai'

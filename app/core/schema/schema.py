@@ -1,5 +1,11 @@
+"""
+Core Schema Definitions
+
+This module defines the core data models and type definitions used throughout the application.
+"""
+
 from enum import Enum
-from typing import Any, List, Literal, Optional, Union
+from typing import Any, Dict, List, Literal, Optional, Union
 
 from pydantic import BaseModel, Field
 
@@ -39,6 +45,7 @@ class AgentState(str, Enum):
 
 
 class Function(BaseModel):
+    """Represents a function in a tool call"""
     name: str
     arguments: str
 
@@ -61,7 +68,7 @@ class Message(BaseModel):
     tool_call_id: Optional[str] = Field(default=None)
 
     def __add__(self, other) -> List["Message"]:
-        """支持 Message + list 或 Message + Message 的操作"""
+        """Support Message + list or Message + Message operations"""
         if isinstance(other, list):
             return [self] + other
         elif isinstance(other, Message):
@@ -71,27 +78,40 @@ class Message(BaseModel):
                 f"unsupported operand type(s) for +: '{type(self).__name__}' and '{type(other).__name__}'"
             )
 
-    def __radd__(self, other) -> List["Message"]:
-        """支持 list + Message 的操作"""
-        if isinstance(other, list):
-            return other + [self]
-        else:
-            raise TypeError(
-                f"unsupported operand type(s) for +: '{type(other).__name__}' and '{type(self).__name__}'"
-            )
-
     def to_dict(self) -> dict:
         """Convert message to dictionary format"""
         message = {"role": self.role}
         if self.content is not None:
             message["content"] = self.content
         if self.tool_calls is not None:
-            message["tool_calls"] = [tool_call.dict() for tool_call in self.tool_calls]
+            message["tool_calls"] = [tool_call.model_dump() for tool_call in self.tool_calls]
         if self.name is not None:
             message["name"] = self.name
         if self.tool_call_id is not None:
             message["tool_call_id"] = self.tool_call_id
         return message
+
+
+class LLMSettings(BaseModel):
+    """Configuration settings for LLM providers"""
+    model: str = Field(..., description="LLM model name")
+    api_type: str = Field("openai", description="API type (openai, azure, google, ollama)")
+    api_key: str = Field(..., description="API key for the LLM service")
+    api_version: Optional[str] = Field(None, description="API version (required for Azure)")
+    base_url: str = Field(..., description="Base URL for the API")
+    max_tokens: int = Field(1024, description="Maximum tokens in the response")
+    temperature: float = Field(0.7, description="Temperature for sampling")
+    allowed_domains: Optional[List[str]] = Field(None, description="Allowed domains for ethical scraping")
+    allowed_content_types: Optional[List[str]] = Field(None, description="Permitted content types")
+
+    def __radd__(self, other) -> List["Message"]:
+        """Support list + Message operations"""
+        if isinstance(other, list):
+            return other + [self]
+        else:
+            raise TypeError(
+                f"unsupported operand type(s) for +: '{type(other).__name__}' and '{type(self).__name__}'"
+            )
 
     @classmethod
     def user_message(cls, content: str) -> "Message":

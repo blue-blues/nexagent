@@ -84,11 +84,7 @@ cd web
 npm install
 ```
 
-### Step 3: Build the Web Interface
 
-```bash
-npm run build
-```
 
 ## Running Nexagent
 
@@ -100,27 +96,7 @@ To run Nexagent in CLI mode:
 python main_cli.py
 ```
 
-### Web Interface Mode
 
-To run Nexagent with the web interface:
-
-```bash
-python main.py
-```
-
-### API Server Mode
-
-To run Nexagent as an API server:
-
-```bash
-python run_api_server.py
-```
-
-For conversation organization features:
-
-```bash
-python run_api_server_with_organization.py
-```
 
 ## Troubleshooting
 

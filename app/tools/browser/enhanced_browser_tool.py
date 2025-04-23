@@ -1,25 +1,20 @@
 import asyncio
 import json
 import random
-import time
-import re
-from typing import Optional, List, Dict, Any, Tuple
+from typing import Optional, List, Dict
 
 from browser_use import Browser as BrowserUseBrowser
 from browser_use import BrowserConfig
 from browser_use.browser.context import BrowserContext, BrowserContextConfig
-from browser_use.browser.browser import ProxySettings
 from browser_use.dom.service import DomService
-from pydantic import Field, field_validator
-from pydantic_core.core_schema import ValidationInfo
+from pydantic import Field
 
 from app.config import config
-from app.tool.base import BaseTool, ToolResult
-from app.tool.browser_use_tool import BrowserUseTool
-from app.tool.data_processor import DataProcessor
-from app.tool.proxy_manager import proxy_manager
-from app.tool.captcha_handler import captcha_handler
-from app.tool.headless_browser_manager import headless_browser_manager
+from app.tools.base import BaseTool, ToolResult
+from app.tools.browser.browser_use_tool import BrowserUseTool
+from app.tools.data_processor import DataProcessor
+from app.logger import logger
+from app.tools.browser.structured_data_extractor import StructuredDataExtractor
 
 
 class EnhancedBrowserTool(BrowserUseTool):
@@ -63,6 +58,7 @@ class EnhancedBrowserTool(BrowserUseTool):
                     "rotate_user_agent",
                     "bypass_cloudflare",
                     "extract_structured",
+                    "extract_structured_data",
                     "navigate_and_extract",
                 ],
                 "description": "The browser action to perform",
@@ -181,7 +177,7 @@ class EnhancedBrowserTool(BrowserUseTool):
                     if enable is not None:
                         self.stealth_mode_enabled = enable
                         if enable:
-                            # Apply stealth mode JavaScript
+                            # Apply enhanced stealth mode JavaScript
                             stealth_script = """
                             // Overwrite the navigator properties
                             Object.defineProperty(navigator, 'webdriver', {
@@ -193,7 +189,20 @@ class EnhancedBrowserTool(BrowserUseTool):
 
                             // Add plugins to appear more like a regular browser
                             Object.defineProperty(navigator, 'plugins', {
-                                get: () => [1, 2, 3, 4, 5],
+                                get: () => [
+                                    { name: 'Chrome PDF Plugin', filename: 'internal-pdf-viewer', description: 'Portable Document Format' },
+                                    { name: 'Chrome PDF Viewer', filename: 'mhjfbmdgcfjbbpaeojofohoefgiehjai', description: 'Portable Document Format' },
+                                    { name: 'Native Client', filename: 'internal-nacl-plugin', description: '' }
+                                ],
+                            });
+
+                            // Add plugin mimetype
+                            Object.defineProperty(navigator, 'mimeTypes', {
+                                get: () => [
+                                    { type: 'application/pdf', suffixes: 'pdf', description: '', enabledPlugin: { name: 'Chrome PDF Plugin' } },
+                                    { type: 'application/x-google-chrome-pdf', suffixes: 'pdf', description: 'Portable Document Format', enabledPlugin: { name: 'Chrome PDF Viewer' } },
+                                    { type: 'application/x-nacl', suffixes: '', description: 'Native Client Executable', enabledPlugin: { name: 'Native Client' } }
+                                ],
                             });
 
                             // Modify the user agent if needed
@@ -224,6 +233,37 @@ class EnhancedBrowserTool(BrowserUseTool):
                                 colorDepth: { value: 24 },
                                 pixelDepth: { value: 24 }
                             });
+
+                            // Override WebGL fingerprinting
+                            const getParameter = WebGLRenderingContext.prototype.getParameter;
+                            WebGLRenderingContext.prototype.getParameter = function(parameter) {
+                                // UNMASKED_VENDOR_WEBGL
+                                if (parameter === 37445) {
+                                    return 'Intel Inc.';
+                                }
+                                // UNMASKED_RENDERER_WEBGL
+                                if (parameter === 37446) {
+                                    return 'Intel Iris OpenGL Engine';
+                                }
+                                return getParameter.apply(this, arguments);
+                            };
+
+                            // Override canvas fingerprinting
+                            const originalToDataURL = HTMLCanvasElement.prototype.toDataURL;
+                            HTMLCanvasElement.prototype.toDataURL = function(type) {
+                                if (this.width > 16 && this.height > 16) {
+                                    // Add slight noise to the canvas
+                                    const ctx = this.getContext('2d');
+                                    const imageData = ctx.getImageData(0, 0, this.width, this.height);
+                                    const pixels = imageData.data;
+                                    for (let i = 0; i < pixels.length; i += 4) {
+                                        // Add very slight noise to the alpha channel
+                                        pixels[i + 3] = pixels[i + 3] > 0 ? pixels[i + 3] - 1 : 0;
+                                    }
+                                    ctx.putImageData(imageData, 0, 0);
+                                }
+                                return originalToDataURL.apply(this, arguments);
+                            };
                             """
                             await context.execute_javascript(stealth_script)
                         return ToolResult(output=f"Stealth mode {'enabled' if enable else 'disabled'}")
@@ -279,6 +319,24 @@ class EnhancedBrowserTool(BrowserUseTool):
                     else:
                         return ToolResult(error="Failed to bypass Cloudflare protection or timed out")
 
+                elif action == "extract_structured_data":
+                    # Get the HTML content of the page
+                    try:
+                        html = await context.execute_javascript("document.documentElement.outerHTML")
+                        current_url = await context.execute_javascript("window.location.href")
+
+                        # Use the structured data extractor
+                        extractor = StructuredDataExtractor()
+                        result = await extractor.execute(
+                            html=html,
+                            url=current_url,
+                            extraction_type=extraction_type or "all"
+                        )
+
+                        return result
+                    except Exception as e:
+                        return ToolResult(error=f"Error extracting structured data: {str(e)}")
+
                 elif action == "extract_structured":
                     if not selector or not extraction_type:
                         return ToolResult(error="Both selector and extraction_type are required")
@@ -291,7 +349,7 @@ class EnhancedBrowserTool(BrowserUseTool):
                                 return elements.length > 0;
                             }})();
                         """)
-                        
+
                         if not element_exists:
                             return ToolResult(error=f"No elements found with selector: '{selector}'. Please check the selector or try a different one.")
                     except Exception as e:
@@ -428,19 +486,19 @@ class EnhancedBrowserTool(BrowserUseTool):
                                 for _ in range(2):
                                     await context.execute_javascript("window.scrollTo(0, document.body.scrollHeight * 0.7);")
                                     await asyncio.sleep(1)
-                                
+
                                 # Reset scroll position
                                 await context.execute_javascript("window.scrollTo(0, 0);")
-                                
+
                                 # Extract text content (main content)
                                 result["text"] = await self._extract_page_text(context)
-                                
+
                                 # Extract all links
                                 result["links"] = await self._extract_page_links(context)
-                                
+
                                 # Extract all tables
                                 result["tables"] = await self._extract_all_tables(context)
-                                
+
                                 return ToolResult(output=f"Successfully navigated to {url} and extracted all content:\n\n{json.dumps(result, ensure_ascii=False)}")
                             except Exception as e:
                                 return ToolResult(error=f"Error extracting 'all' content from {url}: {str(e)}")

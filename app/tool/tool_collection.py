@@ -13,7 +13,6 @@ from app.tool.data_processor import DataProcessor
 from app.tool.output_formatter import OutputFormatter
 from app.tool.enhanced_browser_tool import EnhancedBrowserTool
 from app.tool.fallback_browser_tool import FallbackBrowserTool
-from app.tool.web_ui_browser_tool import WebUIBrowserTool
 from app.tool.enhanced_web_browser import EnhancedWebBrowser
 from app.tool.enhanced_terminal import EnhancedTerminal
 from app.tool.error_handler import ErrorHandler
@@ -21,7 +20,7 @@ from app.tool.error_handler_integration import ErrorHandlerIntegration
 from app.tool.file_saver import FileSaver
 from app.tool.financial_data_extractor import FinancialDataExtractor
 from app.tool.long_running_command import LongRunningCommand
-from app.tool.mcp_server import MCPServer
+
 from app.tool.persistent_terminate import PersistentTerminate
 from app.tool.planning import Planning
 from app.tool.python_execute import PythonExecute
@@ -31,6 +30,7 @@ from app.tool.terminal import Terminal
 from app.tool.terminate import Terminate
 from app.tool.web_search import WebSearch
 from app.tool.conversation_manager import ConversationManager
+from app.tool.message_notification import MessageNotifyUser, MessageAskUser
 
 
 class ToolCollection:
@@ -58,7 +58,7 @@ class ToolCollection:
         "data_processor": DataProcessor(),
         "output_formatter": OutputFormatter(),
         "enhanced_browser": EnhancedBrowserTool(),
-        "web_ui_browser": WebUIBrowserTool(),
+
         "fallback_browser": FallbackBrowserTool(),
         "enhanced_web_browser": EnhancedWebBrowser(),
         "enhanced_terminal": EnhancedTerminal(),
@@ -67,7 +67,7 @@ class ToolCollection:
         "file_saver": FileSaver(),
         "financial_data_extractor": FinancialDataExtractor(),
         "long_running_command": LongRunningCommand(),
-        "mcp_server": MCPServer(),
+
         "persistent_terminate": PersistentTerminate(),
         "planning": Planning(),
         "python_execute": PythonExecute(),
@@ -77,6 +77,8 @@ class ToolCollection:
         "terminate": Terminate(),
         "web_search": WebSearch(),
         "conversation_manager": ConversationManager(),
+        "message_notify_user": MessageNotifyUser(),
+        "message_ask_user": MessageAskUser(),
         }
 
     def __iter__(self):

@@ -55,6 +55,23 @@ Nexagent is a powerful, intelligent agent framework that offers multiple special
 - **Configurable behavior**: Fine-tune operation behavior to suit different sources
 - **Enhanced data formatting**: Output data in multiple human-readable formats (JSON, YAML, CSV, tables)
 
+### Plan Versioning System
+
+- **Version control for plans**: Create, manage, and version plans for complex tasks
+- **Version comparison**: Compare different versions to see what has changed
+- **Rollback capability**: Roll back to previous versions if needed
+- **Version history**: Track the history of changes to a plan
+- **Version tagging**: Tag important versions for easy reference
+
+### Terminal UI Component
+
+- **Syntax highlighting**: Automatically highlights code based on language detection
+- **Command history**: Tracks and allows reuse of previous commands
+- **Autocomplete functionality**: Suggests commands as you type
+- **Code folding**: Collapse and expand code sections for better readability
+- **Multiple tabs**: Work with multiple terminal sessions simultaneously
+- **Search and replace**: Find and modify text within the terminal
+
 ## 🛠️ Installation
 
 ```bash
@@ -78,13 +95,89 @@ python check_dependencies.py
 ### CLI Mode
 
 ```bash
-# Run in CLI mode
-python main_cli.py
+# Run in CLI mode with the legacy interface
+python main.py
+
+# Run in CLI mode with the new architecture
+python main.py --new
 
 > Enter prompt <
 ```
 
 Nexagent now operates exclusively through a command-line interface for improved performance and reliability. The web interface has been removed in favor of a more streamlined terminal-based experience.
+
+### New Architecture
+
+Nexagent has been redesigned with a new modular architecture that follows a layered approach:
+
+1. **Core Layer**: Provides foundational functionality like LLM interfaces, context management, and schema definitions.
+2. **Agent Layer**: Implements the agent loop and various agent types.
+3. **Tools Layer**: Provides tools that agents can use to interact with the world.
+4. **UI Layer**: Provides user interfaces for interacting with the system.
+5. **Integration Layer**: Provides integration points with external systems.
+
+To use the new architecture, run the application with the `--new` flag:
+
+```bash
+python main.py --new
+```
+
+You can also run the simple agent example to see the new architecture in action:
+
+```bash
+python examples/simple_agent_example.py
+```
+
+### Terminal UI Component
+
+```bash
+# Run the Terminal UI Component demo
+python run_terminal_ui.py
+```
+
+The Terminal UI Component provides a rich terminal interface with syntax highlighting, command history, autocomplete, code folding, and multiple tabs.
+
+#### Terminal UI Commands
+
+```
+# Tab management
+tab <tab_name> - Create a new tab with the specified name
+new-tab - Create a new tab with a default name
+list-tabs - List all tabs
+switch-tab <tab_name> - Switch to the specified tab
+close-tab [tab_name] - Close the specified tab or the active tab if not specified
+
+# History and navigation
+history - Show command history
+clear - Clear the terminal screen
+
+# Exit
+exit, quit - Exit the Terminal UI
+```
+
+### CLI Commands
+
+```
+# Basic commands
+stats - Show routing statistics
+upload <file_path> - Upload and process a file
+attach <file_path> - Attach a file to your next message
+plan - Access the plan versioning system
+exit - Quit the application
+
+# Plan versioning commands
+plan help - Show help for plan commands
+plan list - List all plans
+plan create <plan_id> <title> - Create a new plan
+plan get <plan_id> - Get a plan
+plan update <plan_id> <title> - Update a plan
+plan version create <plan_id> <version_id> <description> - Create a version
+plan version list <plan_id> - List versions of a plan
+plan version get <plan_id> <version_id> - Get a specific version
+plan version compare <plan_id> <version_id1> <version_id2> - Compare versions
+plan version rollback <plan_id> <version_id> - Rollback to a version
+plan version history <plan_id> - Get version history
+```
 
 
 ## ⚙️ Configuration
@@ -251,6 +344,65 @@ if __name__ == "__main__":
 ```
 
 ## 📊 Advanced Usage
+
+### New Architecture Development
+
+The new architecture provides a more modular and extensible framework for building AI agents. Here's how to use it:
+
+#### Creating a New Agent
+
+To create a new agent type:
+
+1. Create a new class that inherits from `AgentLoop` in the `app/agent/types` directory.
+2. Implement the `step` method to define the agent's behavior.
+3. Register the agent type in `app/agent/factory/__init__.py`.
+
+Example:
+
+```python
+from app.agent.loop.agent_loop import AgentLoop
+
+class MyAgent(AgentLoop):
+    async def step(self) -> str:
+        # Implement your agent's behavior here
+        return "Step result"
+
+# In app/agent/factory/__init__.py
+AgentFactory.register_agent_type("my_agent", MyAgent)
+```
+
+#### Creating a New Tool
+
+To create a new tool:
+
+1. Create a function that implements the tool's behavior.
+2. Register the tool in the `ToolRegistry`.
+
+Example:
+
+```python
+from app.tools.registry.tool_registry import ToolRegistry
+
+async def my_tool(arg1: str, arg2: int) -> str:
+    # Implement your tool's behavior here
+    return f"Result: {arg1}, {arg2}"
+
+# Register the tool
+ToolRegistry.register_function_as_tool(
+    name="my_tool",
+    description="A custom tool that does something",
+    function=my_tool,
+    parameters={
+        "type": "object",
+        "properties": {
+            "arg1": {"type": "string"},
+            "arg2": {"type": "integer"}
+        },
+        "required": ["arg1", "arg2"]
+    },
+    category="custom"
+)
+```
 
 ### Handling Complex Data Structures
 

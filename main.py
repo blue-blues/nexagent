@@ -1,17 +1,32 @@
+#!/usr/bin/env python3
+"""
+Nexagent Main Entry Point
+
+This is the main entry point for the Nexagent application.
+"""
+
 import asyncio
 import traceback
 import os
-from typing import Optional
+import shutil
+import sys
+from pathlib import Path
+from typing import Optional, Dict, Any
 
+# Import from the new architecture
+from app.ui.cli.cli import main as cli_main
+from app.utils.logging.logger import logger
+
+# Legacy imports - will be migrated to the new architecture
 from app.flow.integrated_flow import IntegratedFlow
-from app.logger import logger
 from app.session import session_manager
 from app.timeline.timeline import Timeline
 from app.timeline.events import create_user_input_event, create_error_event
 from app.integration.adaptive_nexagent import AdaptiveNexagentIntegration
+from app.agent.manus_agent import ManusAgent
 
 
-async def process_request(prompt: str, adaptive_nexagent: AdaptiveNexagentIntegration, session_id: Optional[str] = None, processing_mode: str = "auto") -> dict:
+async def process_request(prompt: str, adaptive_nexagent: AdaptiveNexagentIntegration, session_id: Optional[str] = None, processing_mode: str = "auto", file_attachment: Optional[str] = None) -> dict:
     """
     Process a user request through the adaptive nexagent integration.
 
@@ -20,16 +35,23 @@ async def process_request(prompt: str, adaptive_nexagent: AdaptiveNexagentIntegr
         adaptive_nexagent: The AdaptiveNexagentIntegration instance
         session_id: Optional session ID
         processing_mode: Processing mode ('auto', 'chat', or 'agent')
+        file_attachment: Optional path to a file attachment
 
     Returns:
         A dictionary with the processing results
     """
     try:
         # Process the prompt through the adaptive nexagent
+        context = {"processing_mode": processing_mode}
+
+        # Add file attachment to context if provided
+        if file_attachment and os.path.exists(file_attachment):
+            context["file_attachment"] = file_attachment
+
         response = await adaptive_nexagent.process_prompt(
             prompt=prompt,
             conversation_id=session_id,
-            context={"processing_mode": processing_mode}
+            context=context
         )
 
         # Extract the result and timeline
@@ -93,6 +115,8 @@ async def main():
     with continuous learning capabilities. The system automatically adapts to user
     interactions and improves over time.
     """
+    # Variable to store attached file path
+    attached_file = None
     print("\n=== Adaptive Nexagent AI Assistant System ===\n")
     print("This system combines general-purpose and specialized capabilities with adaptive learning.")
     print("Your interactions help the system improve over time.")
@@ -116,6 +140,8 @@ async def main():
             from app.tools.browser import WebSearch, EnhancedBrowserTool
             from app.tools.conversation_file_saver import ConversationFileSaver
             from app.tools.message_classifier import MessageClassifier
+            from app.tools.file_attachment_processor import FileAttachmentProcessor
+            from app.tools.planning import PlanningTool
             # TaskAnalytics is not available yet, so we'll skip it for now
             # Use Terminate from the terminate module
             from app.tools.terminate import Terminate
@@ -126,6 +152,8 @@ async def main():
                 EnhancedBrowserTool(),
                 ConversationFileSaver(),
                 MessageClassifier(),
+                FileAttachmentProcessor(),
+                PlanningTool(),
                 # TaskAnalytics is not available yet
                 Terminate()
             )
@@ -151,10 +179,16 @@ async def main():
     print("Type 'stats' to see performance statistics.")
     print("Type 'feedback' to provide feedback on the last response.")
     print("Type 'save' to save the learning system state.")
-    print("Type 'mode chat' to use chat mode, 'mode agent' to use agent mode, or 'mode auto' to use automatic detection.")
+    print("Type 'upload <file_path>' to upload and process a file.")
+    print("Type 'attach <file_path>' to attach a file to your next message.")
+    print("Type 'mode chat' to use chat mode, 'mode agent' to use agent mode, 'mode manus' to use Manus AI mode, or 'mode auto' to use automatic detection.")
 
     # Default processing mode
     processing_mode = "auto"
+
+    # Initialize ManusAgent
+    manus_agent = ManusAgent()
+    logger.info("ManusAgent initialized with timeline and memory capabilities")
 
     try:
         while True:
@@ -178,11 +212,11 @@ async def main():
 
             if prompt.lower().startswith('mode '):
                 mode = prompt.lower().split(' ')[1] if len(prompt.lower().split(' ')) > 1 else ''
-                if mode in ['chat', 'agent', 'auto']:
+                if mode in ['chat', 'agent', 'auto', 'manus']:
                     processing_mode = mode
                     print(f"Processing mode set to: {processing_mode}")
                 else:
-                    print("Invalid mode. Available modes: 'chat', 'agent', 'auto'")
+                    print("Invalid mode. Available modes: 'chat', 'agent', 'manus', 'auto'")
                 continue
 
             if prompt.lower() == 'feedback':
@@ -219,6 +253,101 @@ async def main():
                 print("State saved successfully.")
                 continue
 
+            if prompt.lower().startswith('attach '):
+                file_path = prompt[7:].strip()
+                if not os.path.exists(file_path):
+                    print(f"File not found: {file_path}")
+                    attached_file = None
+                else:
+                    # Create a conversation folder if needed
+                    conversation_folder = Path(os.path.join(os.getcwd(), "data_store", "conversations", session.session_id))
+                    attachments_folder = conversation_folder / "attachments"
+                    attachments_folder.mkdir(parents=True, exist_ok=True)
+
+                    # Copy the file to the attachments folder
+                    file_name = os.path.basename(file_path)
+                    destination_path = str(attachments_folder / file_name)
+                    shutil.copy2(file_path, destination_path)
+
+                    attached_file = destination_path
+                    print(f"File attached: {file_name}")
+                    print(f"File saved to: {destination_path}")
+                    print("The file will be processed with your next message.")
+                continue
+
+            if prompt.lower().startswith('upload '):
+                file_path = prompt[7:].strip()
+                if not os.path.exists(file_path):
+                    print(f"File not found: {file_path}")
+                    continue
+
+                print(f"Processing file: {file_path}")
+                try:
+                    # Create a conversation folder if needed
+                    conversation_folder = Path(os.path.join(os.getcwd(), "data_store", "conversations", session.session_id))
+                    attachments_folder = conversation_folder / "attachments"
+                    attachments_folder.mkdir(parents=True, exist_ok=True)
+
+                    # Copy the file to the attachments folder
+                    file_name = os.path.basename(file_path)
+                    destination_path = str(attachments_folder / file_name)
+                    shutil.copy2(file_path, destination_path)
+
+                    # Process the file
+                    processor = FileAttachmentProcessor()
+                    result = await processor.execute(
+                        file_path=destination_path,
+                        conversation_id=session.session_id,
+                        process_content=True
+                    )
+
+                    if result.error:
+                        print(f"Error processing file: {result.output}")
+                    else:
+                        print(f"File uploaded successfully: {file_name}")
+                        print(f"File saved to: {destination_path}")
+
+                        # If content was processed, ask the user if they want to analyze it
+                        if result.output.get("content"):
+                            analyze = input("\nWould you like to analyze this file? (y/n): ")
+                            if analyze.lower() == 'y':
+                                # Create a prompt with the file content
+                                file_prompt = f"Please analyze the content of the file '{file_name}':\n\n{result.output.get('content')}"
+
+                                # Process the request
+                                print("Processing file analysis request... (This may take a moment)")
+                                response = await asyncio.wait_for(
+                                    process_request(file_prompt, adaptive_nexagent, session.session_id, processing_mode),
+                                    timeout=3600,  # 60 minute timeout
+                                )
+
+                                # Extract the result and metadata
+                                result = response["result"]
+                                timeline = response["timeline"]
+                                success = response["success"]
+                                elapsed_time = response.get("elapsed_time", 0)
+
+                                # Log the result
+                                if success:
+                                    logger.info(f"File analysis completed successfully in {elapsed_time:.2f} seconds")
+                                    print(f"\nFile analysis completed in {elapsed_time:.2f} seconds")
+                                else:
+                                    logger.warning(f"File analysis failed: {response.get('error', 'Unknown error')}")
+                                    print(f"\nFile analysis failed: {response.get('error', 'Unknown error')}")
+
+                                # Record task in session history
+                                session.add_task(
+                                    prompt=file_prompt,
+                                    result=result,
+                                    success=success,
+                                    timeline_data=timeline.to_dict() if timeline else None
+                                )
+                except Exception as e:
+                    logger.error(f"Error uploading file: {str(e)}")
+                    print(f"Error uploading file: {str(e)}")
+
+                continue
+
             if not prompt.strip():
                 logger.warning("Empty prompt provided. Please enter a valid prompt.")
                 continue
@@ -226,16 +355,43 @@ async def main():
             # Mark session as active
             session.mark_active()
 
-            # Process the request through the adaptive nexagent
+            # Process the request through the appropriate agent
             logger.warning(f"Processing your request in {processing_mode} mode...")
             print(f"Processing your request in {processing_mode} mode... (This may take a moment)")
 
             # Process the request with a timeout
             try:
-                response = await asyncio.wait_for(
-                    process_request(prompt, adaptive_nexagent, session.session_id, processing_mode),
-                    timeout=3600,  # 60 minute timeout for the entire execution
-                )
+                # Check if there's an attached file
+                current_file = None
+                if attached_file:
+                    print(f"Processing with attached file: {attached_file}")
+                    current_file = attached_file
+                    # Reset the attached file after using it
+                    attached_file = None
+
+                if processing_mode == "manus":
+                    # Use ManusAgent directly
+                    start_time = asyncio.get_event_loop().time()
+                    result = await manus_agent.run(prompt)
+                    elapsed_time = asyncio.get_event_loop().time() - start_time
+
+                    # Create a response similar to what process_request returns
+                    response = {
+                        "result": result,
+                        "success": True,
+                        "elapsed_time": elapsed_time,
+                        "timeline": manus_agent.timeline,
+                        "task_type": "manus_task",
+                        "agent_id": "manus_agent",
+                        "tools_used": [tool.name for tool in manus_agent.available_tools.tools if hasattr(tool, "name")],
+                        "interaction_id": f"manus_{int(start_time)}"
+                    }
+                else:
+                    # Use the adaptive nexagent
+                    response = await asyncio.wait_for(
+                        process_request(prompt, adaptive_nexagent, session.session_id, processing_mode, current_file),
+                        timeout=3600,  # 60 minute timeout for the entire execution
+                    )
 
                 # Extract the result and metadata
                 result = response["result"]
@@ -300,5 +456,20 @@ async def main():
         session.mark_terminated()
 
 
+def legacy_main():
+    """Legacy main function - will be removed in future versions"""
+    return asyncio.run(main())
+
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    # Check if we should use the new CLI or the legacy interface
+    if "--new" in sys.argv:
+        # Remove the --new flag from sys.argv
+        sys.argv.remove("--new")
+        # Use the new CLI
+        sys.exit(cli_main())
+    else:
+        # Use the legacy interface with a deprecation warning
+        print("WARNING: Using legacy interface. This will be removed in future versions.")
+        print("Use --new flag to use the new interface.")
+        legacy_main()

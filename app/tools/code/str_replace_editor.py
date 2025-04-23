@@ -240,6 +240,12 @@ class StrReplaceEditor(BaseTool):
         old_str = old_str.expandtabs()
         new_str = new_str.expandtabs() if new_str is not None else ""
 
+        # Check if old_str is empty
+        if not old_str:
+            raise ToolError(
+                "The `old_str` parameter cannot be empty. Please provide a non-empty string to replace."
+            )
+
         # Check if old_str is unique in the file
         occurrences = file_content.count(old_str)
         if occurrences == 0:
@@ -266,11 +272,17 @@ class StrReplaceEditor(BaseTool):
         # Save the content to history
         self._file_history[path].append(file_content)
 
-        # Create a snippet of the edited section
-        replacement_line = file_content.split(old_str)[0].count("\n")
-        start_line = max(0, replacement_line - SNIPPET_LINES)
-        end_line = replacement_line + SNIPPET_LINES + new_str.count("\n")
-        snippet = "\n".join(new_file_content.split("\n")[start_line : end_line + 1])
+        # Create a snippet of the edited section - safely handle the split operation
+        try:
+            replacement_line = file_content.split(old_str)[0].count("\n")
+            start_line = max(0, replacement_line - SNIPPET_LINES)
+            end_line = replacement_line + SNIPPET_LINES + new_str.count("\n")
+            snippet = "\n".join(new_file_content.split("\n")[start_line : end_line + 1])
+        except ValueError:
+            # Fallback if there's an issue with splitting - just show the first few lines
+            start_line = 0
+            end_line = min(SNIPPET_LINES * 2, len(new_file_content.split("\n")))
+            snippet = "\n".join(new_file_content.split("\n")[start_line:end_line])
 
         # Prepare the success message
         success_msg = f"The file {path} has been edited. "

@@ -152,7 +152,7 @@ class StrReplaceEditor(BaseTool):
                 raise ToolError(
                     f"The path {path} is not an absolute path, it should start with `/`. Maybe you meant {suggested_path}?"
                 )
-        
+
         # For create command, we only need to check if the file already exists
         if command == "create":
             if path.exists():
@@ -160,13 +160,13 @@ class StrReplaceEditor(BaseTool):
                     f"File already exists at: {path}. Cannot overwrite files using command `create`."
                 )
             return
-            
+
         # Check if path exists for other commands
         if not path.exists():
             raise ToolError(
                 f"The path {path} does not exist. Please provide a valid path."
             )
-            
+
         # Check if the path points to a directory
         if path.is_dir():
             if command != "view":
@@ -181,7 +181,7 @@ class StrReplaceEditor(BaseTool):
                 raise ToolError(
                     "The `view_range` parameter is not allowed when `path` points to a directory."
                 )
-            
+
             # Use a more efficient approach for directory listing with timeout handling
             try:
                 if os.name == 'nt':  # Windows
@@ -192,11 +192,11 @@ class StrReplaceEditor(BaseTool):
                     # Use find command on Unix with a 30-second timeout
                     _, stdout, stderr = await run(
                         f"find \"{path}\" -type f -not -path \"*/\\.*\" | sort")
-                
+
                 return CLIResult(output=maybe_truncate(stdout))
             except Exception as e:
                 raise ToolError(f"Failed to list directory {path}: {str(e)}")
-        
+
         # If it's a file, read its content
         try:
             file_content = self.read_file(path)
@@ -240,6 +240,12 @@ class StrReplaceEditor(BaseTool):
         old_str = old_str.expandtabs()
         new_str = new_str.expandtabs() if new_str is not None else ""
 
+        # Check if old_str is empty
+        if not old_str:
+            raise ToolError(
+                "The `old_str` parameter cannot be empty. Please provide a non-empty string to replace."
+            )
+
         # Check if old_str is unique in the file
         occurrences = file_content.count(old_str)
         if occurrences == 0:
@@ -266,11 +272,17 @@ class StrReplaceEditor(BaseTool):
         # Save the content to history
         self._file_history[path].append(file_content)
 
-        # Create a snippet of the edited section
-        replacement_line = file_content.split(old_str)[0].count("\n")
-        start_line = max(0, replacement_line - SNIPPET_LINES)
-        end_line = replacement_line + SNIPPET_LINES + new_str.count("\n")
-        snippet = "\n".join(new_file_content.split("\n")[start_line : end_line + 1])
+        # Create a snippet of the edited section - safely handle the split operation
+        try:
+            replacement_line = file_content.split(old_str)[0].count("\n")
+            start_line = max(0, replacement_line - SNIPPET_LINES)
+            end_line = replacement_line + SNIPPET_LINES + new_str.count("\n")
+            snippet = "\n".join(new_file_content.split("\n")[start_line : end_line + 1])
+        except ValueError:
+            # Fallback if there's an issue with splitting - just show the first few lines
+            start_line = 0
+            end_line = min(SNIPPET_LINES * 2, len(new_file_content.split("\n")))
+            snippet = "\n".join(new_file_content.split("\n")[start_line:end_line])
 
         # Prepare the success message
         success_msg = f"The file {path} has been edited. "
@@ -374,26 +386,26 @@ class StrReplaceEditor(BaseTool):
             + file_content
             + "\n"
         )
-        
+
     def get_conversation_memory(self, path: Path, limit: int = 10):
         """Retrieve conversation memory for a specific path.
-        
+
         Args:
             path: The path to retrieve conversation memory for
             limit: Maximum number of entries to return (most recent first)
-            
+
         Returns:
             A list of conversation memory entries
         """
         if path not in self._conversation_memory:
             return []
-        
+
         # Return the most recent entries first, limited by the limit parameter
         return list(reversed(self._conversation_memory[path][-limit:]))
-    
+
     def clear_conversation_memory(self, path: Path = None):
         """Clear conversation memory.
-        
+
         Args:
             path: The path to clear conversation memory for. If None, clear all conversation memory.
         """
@@ -401,18 +413,18 @@ class StrReplaceEditor(BaseTool):
             self._conversation_memory.clear()
         elif path in self._conversation_memory:
             del self._conversation_memory[path]
-            
+
     def get_conversation_summary(self, path: Path = None):
         """Generate a summary of conversation memory.
-        
+
         Args:
             path: The path to generate a summary for. If None, generate a summary for all paths.
-            
+
         Returns:
             A dictionary with summary information
         """
         summary = {}
-        
+
         if path is not None:
             if path in self._conversation_memory:
                 entries = self._conversation_memory[path]
@@ -426,5 +438,5 @@ class StrReplaceEditor(BaseTool):
                     "total_interactions": len(entries),
                     "commands": {cmd: sum(1 for e in entries if e["command"] == cmd) for cmd in get_args(Command)},
                 }
-                
+
         return summary

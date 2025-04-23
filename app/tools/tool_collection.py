@@ -9,7 +9,7 @@ from app.tools.dependency_resolver import DependencyResolver, DependencyError
 from app.tools.terminal import Terminal, Bash, EnhancedTerminal
 
 # Import browser tools
-from app.tools.browser import BrowserUseTool, EnhancedBrowserTool, WebUIBrowserTool
+from app.tools.browser import BrowserUseTool, EnhancedBrowserTool
 
 # Import code tools
 from app.tools.code import CodeAnalyzer, PythonExecute, StrReplaceEditor
@@ -24,11 +24,12 @@ from app.tools.error_handler_integration import ErrorHandlerIntegration
 from app.tools.file_saver import FileSaver
 from app.tools.financial_data_extractor import FinancialDataExtractor
 from app.tools.long_running_command import LongRunningCommand
-from app.tools.mcp_server import MCPServer
+
 from app.tools.persistent_terminate import PersistentTerminate
 from app.tools.planning import Planning
 from app.tools.task_analytics import TaskAnalytics
 from app.tools.conversation_manager import ConversationManager
+from app.tools.message_notification import MessageNotifyUser, MessageAskUser
 
 
 class ToolCollection:
@@ -56,14 +57,14 @@ class ToolCollection:
             "data_processor": DataProcessor(),
             "output_formatter": OutputFormatter(),
             "enhanced_browser": EnhancedBrowserTool(),
-            "web_ui_browser": WebUIBrowserTool(),
+
             "enhanced_terminal": EnhancedTerminal(),
             "error_handler": ErrorHandler(),
             "error_handler_integration": ErrorHandlerIntegration(),
             "file_saver": FileSaver(),
             "financial_data_extractor": FinancialDataExtractor(),
             "long_running_command": LongRunningCommand(),
-            "mcp_server": MCPServer(),
+
             "persistent_terminate": PersistentTerminate(),
             "planning": Planning(),
             "python_execute": PythonExecute(),
@@ -72,6 +73,8 @@ class ToolCollection:
             "terminal": Terminal(),
             "terminate": Terminate(),
             "conversation_manager": ConversationManager(),
+            "message_notify_user": MessageNotifyUser(),
+            "message_ask_user": MessageAskUser(),
         }
 
         # Add optional tools if they exist
