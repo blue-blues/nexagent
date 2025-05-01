@@ -7,8 +7,8 @@ from urllib.parse import urlparse
 from app.config import config
 from app.logger import logger
 from app.exceptions import DataProcessingError
-from app.tool.output_formatter import OutputFormatter
-from app.tool.base import BaseTool, ToolResult
+from app.tools.output_formatter import OutputFormatter
+from app.tools.base import BaseTool, ToolResult
 
 
 class DataProcessor(BaseTool):
@@ -58,34 +58,34 @@ class DataProcessor(BaseTool):
         self.allowed_content_types = getattr(config.llm.get('default', {}), 'allowed_content_types', [])
 
     async def execute(
-        self, 
-        data: Union[Dict[str, Any], List], 
-        format: str = "json", 
+        self,
+        data: Union[Dict[str, Any], List],
+        format: str = "json",
         output_file: Optional[str] = None,
         indent: int = 2,
         sort_keys: bool = False
     ) -> ToolResult:
         """Process and format data with options for improved readability.
-        
+
         Args:
             data: The data to process and format
             format: The desired output format (json, yaml, csv, table, text)
             output_file: Optional path to save the formatted output
             indent: Number of spaces for indentation in JSON format
             sort_keys: Whether to sort dictionary keys in output
-            
+
         Returns:
             ToolResult with formatted data or file path information
         """
         try:
             # Format the data according to the specified format
             formatted_data = self.formatter.format(
-                data, 
-                format_type=format, 
-                indent=indent, 
+                data,
+                format_type=format,
+                indent=indent,
                 sort_keys=sort_keys
             )
-            
+
             # Save to file if output_file is specified
             if output_file:
                 output_path = Path(output_file)
@@ -94,15 +94,15 @@ class DataProcessor(BaseTool):
             else:
                 # Return the formatted data directly
                 return ToolResult(output=formatted_data)
-                
+
         except Exception as e:
             logger.error(f"Data processing failed: {str(e)}")
-            return ToolResult(output=f"Error processing data: {str(e)}", error=True)
+            return ToolResult(output=f"Error processing data: {str(e)}", error=str(e))
 
     def process_from_url(self, data: Dict[str, Any], url: str, content_type: str, format: str = "json") -> Path:
         """Process scraped data with ethical validation and format detection"""
         self._validate_source(url, content_type)
-        
+
         try:
             output_path = self._get_output_path(url, format)
             formatted_data = self.formatter.format(data, format_type=format)
@@ -116,10 +116,10 @@ class DataProcessor(BaseTool):
     def _validate_source(self, url: str, content_type: str):
         """Validate data source against ethical scraping policies"""
         parsed_url = urlparse(url)
-        
+
         if self.allowed_domains and parsed_url.netloc not in self.allowed_domains:
             raise ValueError(f"Domain {parsed_url.netloc} not in allowed list")
-        
+
         if self.allowed_content_types and content_type not in self.allowed_content_types:
             raise ValueError(f"Content type {content_type} not permitted")
 
@@ -133,6 +133,6 @@ class DataProcessor(BaseTool):
     def _save_formatted_data(self, formatted_data: str, output_path: Path):
         """Save formatted data to the specified path"""
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        
+
         with open(output_path, 'w', encoding='utf-8') as f:
             f.write(formatted_data)

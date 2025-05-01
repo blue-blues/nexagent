@@ -10,6 +10,12 @@ from app.logger import logger
 from app.prompt.toolcall import NEXT_STEP_PROMPT, SYSTEM_PROMPT
 from app.schema import TOOL_CHOICE_TYPE, AgentState, Message, ToolCall, ToolChoice
 from app.tools import CreateChatCompletion, Terminate, ToolCollection
+from app.tools.terminal import Terminal, Bash
+from app.tools.code import PythonExecute, CodeAnalyzer, StrReplaceEditor
+from app.tools.browser import WebSearch, EnhancedBrowserTool
+from app.tools.file_saver import FileSaver
+from app.tools.data_processor import DataProcessor
+from app.tools.message_notification import MessageNotifyUser, MessageAskUser
 
 
 TOOL_CALL_REQUIRED = "Tool calls required but none provided"
@@ -25,7 +31,32 @@ class ToolCallAgent(ReActAgent):
     next_step_prompt: str = NEXT_STEP_PROMPT
 
     available_tools: ToolCollection = ToolCollection(
-        CreateChatCompletion(), Terminate()
+        # Basic tools
+        CreateChatCompletion(),
+
+        # Terminal tools
+        Terminal(),
+        Bash(),
+
+        # Code tools
+        PythonExecute(),
+        CodeAnalyzer(),
+        StrReplaceEditor(),
+
+        # Browser tools
+        WebSearch(),
+        EnhancedBrowserTool(),
+
+        # File and data tools
+        FileSaver(),
+        DataProcessor(),
+
+        # User interaction tools
+        MessageNotifyUser(),
+        MessageAskUser(),
+
+        # System tools
+        Terminate()
     )
     tool_choices: TOOL_CHOICE_TYPE = ToolChoice.AUTO  # type: ignore
     special_tool_names: List[str] = Field(default_factory=lambda: [Terminate().name])
@@ -36,7 +67,7 @@ class ToolCallAgent(ReActAgent):
     max_observe: Optional[Union[int, bool]] = None
 
     # Track thought history for loop detection
-    thought_history: List[str] = Field(default_factory=list)
+    thought_history: List[Any] = Field(default_factory=list)  # Can contain strings or dictionaries
     max_thought_repetitions: int = 3
 
     async def think(self) -> bool:
@@ -346,7 +377,7 @@ class ToolCallAgent(ReActAgent):
         # If content contains action words but no tools were selected, likely needs tools
         return any(indicator in content.lower() for indicator in tool_indicators)
 
-    def _update_thought_history(self, content: Optional[str]) -> None:
+    def _update_thought_history(self, content: Optional[Any]) -> None:
         """Update thought history for loop detection"""
         if not content:
             return
@@ -355,13 +386,21 @@ class ToolCallAgent(ReActAgent):
         if len(self.thought_history) >= 10:
             self.thought_history.pop(0)
 
-        self.thought_history.append(content)
+        # Handle dictionary inputs (from ManusAgent)
+        if isinstance(content, dict) and 'content' in content:
+            # Store the original dictionary to maintain compatibility with ManusAgent
+            self.thought_history.append(content)
+        else:
+            # Store string content directly
+            self.thought_history.append(content)
 
         # Broadcast thought to websocket clients
-        if self.websocket:
+        if hasattr(self, 'websocket') and self.websocket:
+            # Ensure we're sending a string for the content
+            broadcast_content = content['content'] if isinstance(content, dict) and 'content' in content else content
             self.websocket.broadcast({
                 'type': 'thought_update',
-                'content': content,
+                'content': broadcast_content,
                 'timestamp': datetime.now().isoformat()
             })
 
@@ -391,12 +430,25 @@ class ToolCallAgent(ReActAgent):
 
         return False
 
-    def _calculate_similarity(self, text1: str, text2: str) -> float:
-        """Calculate simple similarity between two text strings
+    def _calculate_similarity(self, text1: Any, text2: Any) -> float:
+        """Calculate simple similarity between two text inputs
 
         This is a simplified version that doesn't require external libraries.
         Returns a value between 0 (completely different) and 1 (identical).
+
+        Handles both string inputs and dictionary inputs (from ManusAgent).
         """
+        # Handle dictionary inputs (from ManusAgent)
+        if isinstance(text1, dict) and 'content' in text1:
+            text1 = text1['content']
+        if isinstance(text2, dict) and 'content' in text2:
+            text2 = text2['content']
+
+        # Ensure we have string inputs
+        if not isinstance(text1, str) or not isinstance(text2, str):
+            logger.warning(f"Cannot calculate similarity for non-string inputs: {type(text1)}, {type(text2)}")
+            return 0.0
+
         # Convert to lowercase and split into words
         words1 = set(text1.lower().split())
         words2 = set(text2.lower().split())

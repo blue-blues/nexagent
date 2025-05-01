@@ -181,10 +181,10 @@ async def main():
     print("Type 'save' to save the learning system state.")
     print("Type 'upload <file_path>' to upload and process a file.")
     print("Type 'attach <file_path>' to attach a file to your next message.")
-    print("Type 'mode chat' to use chat mode, 'mode agent' to use agent mode, 'mode manus' to use Manus AI mode, or 'mode auto' to use automatic detection.")
+    print("The system is running in Manus AI mode.")
 
-    # Default processing mode
-    processing_mode = "auto"
+    # Always use Manus mode
+    processing_mode = "manus"
 
     # Initialize ManusAgent
     manus_agent = ManusAgent()
@@ -211,12 +211,7 @@ async def main():
                 continue
 
             if prompt.lower().startswith('mode '):
-                mode = prompt.lower().split(' ')[1] if len(prompt.lower().split(' ')) > 1 else ''
-                if mode in ['chat', 'agent', 'auto', 'manus']:
-                    processing_mode = mode
-                    print(f"Processing mode set to: {processing_mode}")
-                else:
-                    print("Invalid mode. Available modes: 'chat', 'agent', 'manus', 'auto'")
+                print("Only Manus mode is available. The system is already in Manus mode.")
                 continue
 
             if prompt.lower() == 'feedback':
@@ -355,43 +350,36 @@ async def main():
             # Mark session as active
             session.mark_active()
 
-            # Process the request through the appropriate agent
-            logger.warning(f"Processing your request in {processing_mode} mode...")
-            print(f"Processing your request in {processing_mode} mode... (This may take a moment)")
+            # Process the request through the ManusAgent
+            logger.warning("Processing your request with Manus AI...")
+            print("Processing your request with Manus AI... (This may take a moment)")
 
             # Process the request with a timeout
             try:
                 # Check if there's an attached file
-                current_file = None
                 if attached_file:
                     print(f"Processing with attached file: {attached_file}")
-                    current_file = attached_file
+                    # Add file attachment to prompt
+                    prompt = f"[File attached: {os.path.basename(attached_file)}]\n\n{prompt}"
                     # Reset the attached file after using it
                     attached_file = None
 
-                if processing_mode == "manus":
-                    # Use ManusAgent directly
-                    start_time = asyncio.get_event_loop().time()
-                    result = await manus_agent.run(prompt)
-                    elapsed_time = asyncio.get_event_loop().time() - start_time
+                # Use ManusAgent directly
+                start_time = asyncio.get_event_loop().time()
+                result = await manus_agent.run(prompt)
+                elapsed_time = asyncio.get_event_loop().time() - start_time
 
-                    # Create a response similar to what process_request returns
-                    response = {
-                        "result": result,
-                        "success": True,
-                        "elapsed_time": elapsed_time,
-                        "timeline": manus_agent.timeline,
-                        "task_type": "manus_task",
-                        "agent_id": "manus_agent",
-                        "tools_used": [tool.name for tool in manus_agent.available_tools.tools if hasattr(tool, "name")],
-                        "interaction_id": f"manus_{int(start_time)}"
-                    }
-                else:
-                    # Use the adaptive nexagent
-                    response = await asyncio.wait_for(
-                        process_request(prompt, adaptive_nexagent, session.session_id, processing_mode, current_file),
-                        timeout=3600,  # 60 minute timeout for the entire execution
-                    )
+                # Create a response similar to what process_request returns
+                response = {
+                    "result": result,
+                    "success": True,
+                    "elapsed_time": elapsed_time,
+                    "timeline": manus_agent.timeline,
+                    "task_type": "manus_task",
+                    "agent_id": "manus_agent",
+                    "tools_used": [tool.name for tool in manus_agent.available_tools.tools if hasattr(tool, "name")],
+                    "interaction_id": f"manus_{int(start_time)}"
+                }
 
                 # Extract the result and metadata
                 result = response["result"]

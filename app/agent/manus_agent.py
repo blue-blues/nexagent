@@ -17,9 +17,15 @@ from app.prompt.manus import SYSTEM_PROMPT
 from app.schema import AgentState
 from app.tools import ToolCollection
 from app.tools.browser import WebSearch, EnhancedBrowserTool, BrowserUseTool
-from app.tools.code import PythonExecute
+from app.tools.code import PythonExecute, CodeAnalyzer, StrReplaceEditor
 from app.tools.file_saver import FileSaver
+from app.tools.terminal import Terminal, EnhancedTerminal
+from app.tools.data_processor import DataProcessor
+from app.tools.output_formatter import OutputFormatter
+from app.tools.message_notification import MessageNotifyUser, MessageAskUser
 from app.tools.planning import PlanningTool
+from app.tools.task_analytics import TaskAnalytics
+from app.tools.long_running_command import LongRunningCommand
 from app.tools.terminate import Terminate
 from app.timeline.models import Timeline, EventType
 from app.timeline.tracker import TimelineTracker
@@ -50,12 +56,36 @@ class ManusAgent(ToolCallAgent):
     Consider what information you need to gather and what actions you need to take.
 
     You have access to the following tools:
+
+    Code tools:
     - PythonExecute: For data analysis, calculations, and processing
+    - CodeAnalyzer: For analyzing code and suggesting improvements
+    - StrReplaceEditor: For editing files and making changes to code
+
+    Browser tools:
     - WebSearch: For retrieving information from the web
     - EnhancedBrowserTool: For navigating websites and extracting information
     - BrowserUseTool: For more advanced browser interactions
+
+    File and data tools:
     - FileSaver: For saving results and outputs
+    - DataProcessor: For processing structured data
+    - OutputFormatter: For formatting output in various formats
+
+    Terminal tools:
+    - Terminal: For executing shell commands
+    - EnhancedTerminal: For advanced terminal operations with better output formatting
+    - LongRunningCommand: For executing commands that take a long time to complete
+
+    User interaction tools:
+    - MessageNotifyUser: For sending notifications to the user
+    - MessageAskUser: For asking the user for input
+
+    Planning and analytics tools:
     - PlanningTool: For creating and managing plans
+    - TaskAnalytics: For analyzing task execution and performance
+
+    System tools:
     - Terminate: For ending the task when complete
 
     Show your thinking process as you work through this task.
@@ -71,8 +101,8 @@ class ManusAgent(ToolCallAgent):
     current_task: str = Field(default="", description="The current task being processed")
 
     # Track thought history for analysis
-    thought_history: List[Dict[str, Any]] = Field(
-        default_factory=list, description="History of thinking steps"
+    thought_history: List[Any] = Field(
+        default_factory=list, description="History of thinking steps (can be dictionaries or strings)"
     )
 
     # Timeline tracking
@@ -92,12 +122,35 @@ class ManusAgent(ToolCallAgent):
     # Add comprehensive tools to the tool collection
     available_tools: ToolCollection = Field(
         default_factory=lambda: ToolCollection(
+            # Code tools
             PythonExecute(),
+            CodeAnalyzer(),
+            StrReplaceEditor(),
+
+            # Browser tools
             WebSearch(),
             EnhancedBrowserTool(),
             BrowserUseTool(),
+
+            # File and data tools
             FileSaver(),
+            DataProcessor(),
+            OutputFormatter(),
+
+            # Terminal tools
+            Terminal(),
+            EnhancedTerminal(),
+            LongRunningCommand(),
+
+            # User interaction tools
+            MessageNotifyUser(),
+            MessageAskUser(),
+
+            # Planning and analytics tools
             PlanningTool(),
+            TaskAnalytics(),
+
+            # System tools
             Terminate()
         )
     )
@@ -239,7 +292,17 @@ class ManusAgent(ToolCallAgent):
         # Create a summary of the thinking process
         summary = "Thinking Process Summary:\n\n"
         for i, thought in enumerate(self.thought_history):
-            summary += f"Step {i+1}: {thought['content'][:100]}...\n"
+            # Handle both dictionary and string thoughts
+            if isinstance(thought, dict) and 'content' in thought:
+                content = thought['content']
+                step_num = thought.get('step', i+1)
+                summary += f"Step {step_num}: {content[:100]}...\n"
+            elif isinstance(thought, str):
+                summary += f"Step {i+1}: {thought[:100]}...\n"
+            else:
+                # Skip invalid thought formats
+                logger.warning(f"Skipping invalid thought format: {type(thought)}")
+                continue
 
         return summary
 
