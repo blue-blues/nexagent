@@ -2,22 +2,51 @@
 Task-based integrated flow implementation.
 
 This module provides a TaskBasedIntegratedFlow class that integrates the task-based approach
-with the existing integrated flow functionality.
+with the existing integrated flow functionality. It serves as the main entry point for
+task-based execution in Nexagent, providing a unified interface for handling user requests.
+
+Key features:
+- Automatic task breakdown and execution
+- Conversation management and organization
+- Timeline integration for progress tracking
+- Output formatting and organization
+- Direct response handling for simple queries
+- Error handling and recovery
+
+Copyright (c) 2023-2024 Nexagent
 """
 
 import uuid
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Optional
 
 from app.agent.task_based_nexagent import TaskBasedNexagent
-from app.agent.web_output import WebOutputFormatter
 from app.flow.base import BaseFlow
-from app.flow.task_based_flow import TaskBasedFlow
 from app.logger import logger
-from app.tool.output_organizer import OutputOrganizer
 from app.util.direct_response import is_simple_prompt, get_direct_response
 from app.timeline.timeline import Timeline
 from app.timeline.events import create_user_input_event, create_agent_response_event, create_system_event
+from app.ui.user_input_cli import user_input_cli
+from app.util.user_input_manager import input_manager
+
+# Import formatters and organizers
+try:
+    from app.agent.web_output import WebOutputFormatter
+except ImportError:
+    # Fallback implementation if the module is not available
+    class WebOutputFormatter:
+        @staticmethod
+        def create_structured_output(content: str) -> str:
+            return content
+
+try:
+    from app.tools.output_organizer import OutputOrganizer
+except ImportError:
+    # Fallback implementation if the module is not available
+    class OutputOrganizer:
+        async def execute(self, **_):
+            logger.warning("OutputOrganizer not available, skipping output organization")
+            return None
 
 
 class TaskBasedIntegratedFlow(BaseFlow):
@@ -30,6 +59,18 @@ class TaskBasedIntegratedFlow(BaseFlow):
 
     It also ensures that for every conversation, a new folder is created to store
     related documents and generated outputs.
+
+    Key features:
+    - Automatic task breakdown and execution
+    - Conversation management with unique IDs
+    - Timeline integration for progress tracking
+    - Output formatting and organization
+    - Direct response handling for simple queries
+    - Error handling and recovery
+    - User input handling during execution
+
+    This class serves as the main entry point for task-based execution in Nexagent,
+    providing a unified interface for handling user requests of varying complexity.
     """
 
     def __init__(
@@ -46,6 +87,7 @@ class TaskBasedIntegratedFlow(BaseFlow):
         """
         # Create a new TaskBasedNexagent if not provided
         if task_based_agent is None:
+            logger.info("Creating new TaskBasedNexagent instance")
             task_based_agent = TaskBasedNexagent()
 
         # Initialize with the TaskBasedNexagent as the only agent
@@ -54,16 +96,36 @@ class TaskBasedIntegratedFlow(BaseFlow):
         # Set the primary agent key to the task-based agent
         self.primary_agent_key = "task_based_agent"
 
-        # Set conversation ID and initialize output organizer as instance variables (not model fields)
-        self._conversation_id = conversation_id or f"conv_{uuid.uuid4().hex[:8]}_{int(datetime.now().timestamp())}"
+        # Generate a unique conversation ID if not provided
+        if conversation_id:
+            self._conversation_id = conversation_id
+            logger.info(f"Using provided conversation ID: {self._conversation_id}")
+        else:
+            timestamp = int(datetime.now().timestamp())
+            self._conversation_id = f"conv_{uuid.uuid4().hex[:8]}_{timestamp}"
+            logger.info(f"Generated new conversation ID: {self._conversation_id}")
+
+        # Initialize output organizer
         self._output_organizer = OutputOrganizer()
+
+        # Initialize execution metrics
+        self._execution_start_time = None
+        self._execution_end_time = None
+        self._execution_metrics = {
+            "total_executions": 0,
+            "successful_executions": 0,
+            "failed_executions": 0,
+            "direct_responses": 0,
+            "agent_responses": 0,
+            "avg_execution_time": 0.0
+        }
 
     @property
     def task_based_agent(self) -> TaskBasedNexagent:
         """Get the task-based agent."""
         return self.agents["task_based_agent"]
 
-    async def execute(self, input_text: str = None, prompt: str = None, conversation_id: Optional[str] = None, timeline: Optional[Timeline] = None, **kwargs) -> str:
+    async def execute(self, input_text: str = None, prompt: str = None, conversation_id: Optional[str] = None, timeline: Optional[Timeline] = None, **_) -> str:
         """
         Execute the task-based integrated flow with the given input.
 
@@ -79,11 +141,15 @@ class TaskBasedIntegratedFlow(BaseFlow):
             conversation_id: Optional conversation ID to use. If provided, it will override
                            the conversation ID set during initialization.
             timeline: Optional timeline to track events. If provided, events will be added to this timeline.
-            kwargs: Additional keyword arguments to pass to the agent
+            **_: Additional keyword arguments (ignored)
 
         Returns:
             str: The result from the task-based agent or a direct response
         """
+        # Start execution timer
+        self._execution_start_time = datetime.now().timestamp()
+        self._execution_metrics["total_executions"] += 1
+
         # Use prompt parameter if provided, otherwise use input_text
         input_text = prompt if prompt is not None else input_text
 
@@ -94,6 +160,7 @@ class TaskBasedIntegratedFlow(BaseFlow):
             # Update conversation ID if provided
             if conversation_id:
                 self._conversation_id = conversation_id
+                logger.info(f"Using provided conversation ID: {self._conversation_id}")
 
             # Create a new timeline if not provided
             active_timeline = timeline or Timeline()
@@ -104,6 +171,14 @@ class TaskBasedIntegratedFlow(BaseFlow):
 
             # Log the start of execution
             logger.info(f"Executing task-based integrated flow with input: {input_text[:50]}... (Conversation ID: {self._conversation_id})")
+
+            # Start the user input CLI if not already running
+            if not user_input_cli.running:
+                user_input_cli.start()
+                logger.info("Started user input CLI for handling interactive requests")
+
+            # Clear any previous input requests
+            input_manager.clear_all()
 
             # Create a system event for flow execution
             flow_event = create_system_event(
@@ -140,7 +215,16 @@ class TaskBasedIntegratedFlow(BaseFlow):
                 create_agent_response_event(active_timeline, structured_response)
                 flow_event.mark_success()
 
-                logger.info(f"Direct response provided for conversation {self._conversation_id}")
+                # Update metrics
+                self._execution_metrics["direct_responses"] += 1
+                self._execution_metrics["successful_executions"] += 1
+
+                # End execution timer
+                self._execution_end_time = datetime.now().timestamp()
+                execution_time = self._execution_end_time - self._execution_start_time
+                self._update_execution_time_metrics(execution_time)
+
+                logger.info(f"Direct response provided for conversation {self._conversation_id} in {execution_time:.2f}s")
                 return structured_response
 
             # For complex prompts, delegate to the task-based agent
@@ -164,9 +248,6 @@ class TaskBasedIntegratedFlow(BaseFlow):
                 output_type="document"
             )
 
-            # Log the completion of execution
-            logger.info(f"Task-based integrated flow execution completed for conversation {self._conversation_id}")
-
             # Record the agent response in the timeline if not already recorded
             if not any(event.type == "agent_response" for event in active_timeline.events):
                 create_agent_response_event(active_timeline, structured_result)
@@ -174,9 +255,31 @@ class TaskBasedIntegratedFlow(BaseFlow):
             # Mark the flow execution event as successful
             flow_event.mark_success()
 
+            # Update metrics
+            self._execution_metrics["agent_responses"] += 1
+            self._execution_metrics["successful_executions"] += 1
+
+            # End execution timer
+            self._execution_end_time = datetime.now().timestamp()
+            execution_time = self._execution_end_time - self._execution_start_time
+            self._update_execution_time_metrics(execution_time)
+
+            # Log the completion of execution
+            logger.info(f"Task-based integrated flow execution completed for conversation {self._conversation_id} in {execution_time:.2f}s")
+
+            # Clear any remaining input requests
+            input_manager.clear_all()
+
             return structured_result
         except Exception as e:
-            logger.error(f"Error in task-based integrated flow: {str(e)}")
+            # End execution timer
+            self._execution_end_time = datetime.now().timestamp()
+            execution_time = self._execution_end_time - self._execution_start_time
+
+            # Update metrics
+            self._execution_metrics["failed_executions"] += 1
+
+            logger.error(f"Error in task-based integrated flow after {execution_time:.2f}s: {str(e)}")
 
             # Mark the flow execution event as failed
             if 'flow_event' in locals():
@@ -188,11 +291,42 @@ class TaskBasedIntegratedFlow(BaseFlow):
                     active_timeline,
                     "Error",
                     f"Error in task-based integrated flow: {str(e)}",
-                    metadata={"error": str(e)}
+                    metadata={"error": str(e), "execution_time": execution_time}
                 )
+
+            # Clear any pending input requests
+            input_manager.clear_all()
 
             # Format the error message with a clear structure
             structured_error = WebOutputFormatter.create_structured_output(
                 f"## Implementation Steps\n\nAn error occurred during execution.\n\n## Final Output\n\nI encountered an error while processing your request: {str(e)}"
             )
             return structured_error
+
+    def _update_execution_time_metrics(self, execution_time: float) -> None:
+        """
+        Update the execution time metrics.
+
+        Args:
+            execution_time: The execution time in seconds
+        """
+        # Calculate new average execution time
+        total_successful = self._execution_metrics["successful_executions"]
+        if total_successful > 0:
+            current_avg = self._execution_metrics["avg_execution_time"]
+            # Weighted average: ((n-1) * current_avg + new_time) / n
+            new_avg = ((total_successful - 1) * current_avg + execution_time) / total_successful
+            self._execution_metrics["avg_execution_time"] = new_avg
+
+    def get_metrics(self) -> dict:
+        """
+        Get the execution metrics.
+
+        Returns:
+            Dictionary of execution metrics
+        """
+        return {
+            **self._execution_metrics,
+            "conversation_id": self._conversation_id,
+            "last_execution_time": self._execution_end_time - self._execution_start_time if self._execution_end_time else None
+        }

@@ -2,12 +2,22 @@
 Task-based planning agent implementation.
 
 This module provides a TaskBasedPlanningAgent class that creates and executes plans
-as a series of tasks rather than using a fixed number of steps.
+as a series of tasks rather than using a fixed number of steps. The agent uses a
+planning tool to create structured plans and automatically converts plan steps into
+executable tasks with proper dependency management.
+
+Key features:
+- Dynamic plan creation and execution
+- Plan step to task conversion
+- Plan optimization based on task results
+- Progress tracking and reporting
+- Automatic plan adjustment based on execution feedback
+
+Copyright (c) 2023-2024 Nexagent
 """
 
-import json
 import uuid
-from typing import Dict, List, Optional, Any, Set
+from typing import Dict, List, Optional, Any
 
 from pydantic import Field
 
@@ -24,34 +34,78 @@ from app.planning.plan_optimizer import PlanOptimizer
 
 class TaskBasedPlanningAgent(TaskBasedToolCallAgent):
     """
-    A task-based agent that creates and manages plans to solve tasks.
+    A task-based agent that creates and manages plans to solve complex tasks.
 
-    This agent uses a planning tool to create and manage structured plans,
-    and automatically converts plan steps into executable tasks.
+    This agent extends the TaskBasedToolCallAgent with planning capabilities,
+    allowing it to create structured plans, convert plan steps into executable tasks,
+    and dynamically adjust plans based on execution feedback.
+
+    The agent implements a dynamic planning approach where tasks are generated
+    on-the-fly as previous tasks are completed, rather than creating all tasks
+    upfront. This allows the agent to adapt to changing circumstances and
+    incorporate feedback from task execution into the planning process.
+
+    Key features:
+    - Plan creation and management
+    - Dynamic task generation based on plan steps
+    - Plan optimization based on task execution results
+    - Progress tracking and reporting
+    - Automatic plan adjustment based on execution feedback
+
+    Attributes:
+        name: Unique name of the agent
+        description: Description of the agent
+        system_prompt: System-level instruction prompt
+        task_prompt: Prompt for executing a task
+        available_tools: Collection of tools available to the agent
+        active_plan_id: ID of the currently active plan
+        plan_to_task_map: Mapping from plan step indices to task IDs
+        task_analyzer: Component for analyzing task execution results
+        plan_optimizer: Component for optimizing plans based on feedback
+        completed_tasks: List of completed tasks for analysis
+        current_plan_data: Current plan data for dynamic task generation
+        current_step_index: Current step index in the plan
     """
 
     name: str = "task_based_planning"
-    description: str = "A task-based agent that creates and manages plans to solve tasks"
+    description: str = "A task-based agent that creates and manages plans to solve complex tasks"
+    version: str = "1.0.0"
 
     system_prompt: str = """You are a planning agent that creates and manages plans to solve complex tasks.
 Your job is to break down complex tasks into manageable steps, create a plan, and execute it.
 You can use the planning tool to create, update, and manage plans.
+
+When creating plans:
+1. Break down complex tasks into clear, actionable steps
+2. Ensure each step has a well-defined outcome
+3. Consider dependencies between steps
+4. Adapt the plan based on execution feedback
+5. Optimize the plan as you learn more about the task
+
+Always think carefully about the most efficient way to accomplish the goal.
 """
 
     task_prompt: str = """Complete this task by creating and executing a plan.
-If you want to stop interaction, use `terminate` tool/function call.
+First, analyze the task to understand what needs to be done.
+Then, create a structured plan with clear steps.
+Finally, execute the plan step by step, adapting as needed.
+If you want to stop interaction, use the `terminate` tool/function call.
 """
 
+    # Tool configuration
     available_tools: ToolCollection = Field(
-        default_factory=lambda: ToolCollection(PlanningTool(), Terminate())
+        default_factory=lambda: ToolCollection(PlanningTool(), Terminate()),
+        description="Collection of tools available to the agent"
     )
 
     # Planning attributes
     active_plan_id: Optional[str] = Field(
-        default=None, description="ID of the active plan"
+        default=None,
+        description="ID of the active plan"
     )
     plan_to_task_map: Dict[str, str] = Field(
-        default_factory=dict, description="Mapping from plan step indices to task IDs"
+        default_factory=dict,
+        description="Mapping from plan step indices to task IDs"
     )
 
     # Optimization components
@@ -288,14 +342,18 @@ If you want to stop interaction, use `terminate` tool/function call.
         await self._analyze_and_optimize_plan(task, step_index)
 
         # Generate the next task dynamically based on planner feedback
-        await self._generate_next_task(task, step_index)
+        await self._generate_next_task(task)
 
-    async def _generate_next_task(self, completed_task: Task, step_index: Optional[int] = None) -> None:
+    async def _generate_next_task(self, completed_task: Task, _step_index: Optional[int] = None) -> None:
         """
         Dynamically generate the next task based on the completed task and planner feedback.
 
         This method consults the planner to determine the next step rather than
         following a predefined sequence of steps.
+
+        Args:
+            completed_task: The task that was just completed
+            _step_index: Optional step index in the plan (unused but kept for API compatibility)
         """
         if not self.active_plan_id:
             logger.warning("No active plan to generate next task")
@@ -416,7 +474,7 @@ If you want to stop interaction, use `terminate` tool/function call.
                         # If there are more steps than our current index, create the next task
                         if len(updated_plan["steps"]) > self.current_step_index:
                             self.current_plan_data = updated_plan
-                            await self._generate_next_task(completed_task, self.current_step_index)
+                            await self._generate_next_task(completed_task)
             except Exception as e:
                 logger.error(f"Error checking for additional steps: {str(e)}")
 

@@ -17,8 +17,8 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import Field
 
-from app.tool.base import BaseTool, ToolResult
-from app.tool.browser_factory import BrowserFactory
+from app.tools.base import BaseTool, ToolResult
+from app.tools.browser_factory import BrowserFactory
 from app.config import config
 from app.logger import logger
 

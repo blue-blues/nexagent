@@ -11,7 +11,7 @@ from typing import Dict, List, Optional, Any, Union, Tuple
 
 from pydantic import Field
 
-from app.tool.base import BaseTool, ToolResult
+from app.tools.base import BaseTool, ToolResult
 from app.logger import logger
 
 

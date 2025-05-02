@@ -1,14 +1,17 @@
 import json
 from typing import Any, List, Optional, Union
+from datetime import datetime
 
 from pydantic import Field
 
-from app.agent.react import ReActAgent
+from app.core.agent.react import ReActAgent
 from app.exceptions import TokenLimitExceeded
 from app.logger import logger
 from app.prompt.toolcall import NEXT_STEP_PROMPT, SYSTEM_PROMPT
 from app.schema import TOOL_CHOICE_TYPE, AgentState, Message, ToolCall, ToolChoice
-from app.tool import CreateChatCompletion, Terminate, ToolCollection
+from app.tools.tool_collection import ToolCollection
+from app.tools.create_chat_completion import CreateChatCompletion
+from app.tools.terminate import Terminate
 
 
 TOOL_CALL_REQUIRED = "Tool calls required but none provided"
@@ -37,7 +40,7 @@ class ToolCallAgent(ReActAgent):
     # Track thought history for loop detection
     thought_history: List[str] = Field(default_factory=list)
     max_thought_repetitions: int = 3
-    
+
     async def think(self) -> bool:
         """Process current state and decide next actions using tools"""
         if self.next_step_prompt:
@@ -82,7 +85,7 @@ class ToolCallAgent(ReActAgent):
                     "Please provide more detailed reasoning about the current task and what specific actions should be taken."
                 )
                 self.messages.append(clarification_msg)
-                
+
                 # Get a new response with more detailed thought
                 response = await self.llm.ask_tool(
                     messages=self.messages,
@@ -92,13 +95,13 @@ class ToolCallAgent(ReActAgent):
                     tools=self.available_tools.to_params(),
                     tool_choice=self.tool_choices,
                 )
-                
+
                 # Remove the clarification message to avoid cluttering the history
                 self.messages.pop()
             except Exception as e:
                 logger.error(f"Error getting clarification: {e}")
                 # Continue with original response if clarification fails
-        
+
         self.tool_calls = response.tool_calls
 
         # Check for tool selection issues
@@ -110,7 +113,7 @@ class ToolCallAgent(ReActAgent):
                     "Based on your analysis, please select specific tools to accomplish this task."
                 )
                 self.messages.append(tool_msg)
-                
+
                 # Get a new response with tool selection
                 response = await self.llm.ask_tool(
                     messages=self.messages,
@@ -120,10 +123,10 @@ class ToolCallAgent(ReActAgent):
                     tools=self.available_tools.to_params(),
                     tool_choice=self.tool_choices,
                 )
-                
+
                 # Update tool calls with new response
                 self.tool_calls = response.tool_calls
-                
+
                 # Remove the tool selection message to avoid cluttering the history
                 self.messages.pop()
             except Exception as e:
@@ -142,7 +145,7 @@ class ToolCallAgent(ReActAgent):
 
         # Track thought for loop detection
         self._update_thought_history(response.content)
-        
+
         # Check if we're stuck in a loop
         if self._is_in_thought_loop():
             logger.warning(f"🔄 {self.name} appears to be stuck in a thought loop. Attempting to break out...")
@@ -245,7 +248,7 @@ class ToolCallAgent(ReActAgent):
                 if result
                 else f"Cmd `{name}` completed with no output"
             )
-            
+
             # Apply web formatting if enabled
             observation = self.format_tool_result(raw_observation) if hasattr(self, 'format_tool_result') else raw_observation
 
@@ -284,16 +287,16 @@ class ToolCallAgent(ReActAgent):
     def _is_special_tool(self, name: str) -> bool:
         """Check if tool name is in special tools list"""
         return name.lower() in [n.lower() for n in self.special_tool_names]
-        
+
     def _validate_thought_content(self, content: Optional[str]) -> bool:
         """Validate if thought content is meaningful and not empty"""
         if not content:
             return False
-            
+
         # Check if content is too short or generic
         if len(content.strip()) < 10:
             return False
-            
+
         # Check for generic, non-informative responses
         generic_phrases = [
             "I'll help you with that",
@@ -302,40 +305,40 @@ class ToolCallAgent(ReActAgent):
             "I need more information",
             "I'll do my best"
         ]
-        
+
         # If content is just a generic phrase without specifics, it's not meaningful
         if any(content.strip().lower().startswith(phrase.lower()) for phrase in generic_phrases) and len(content.strip()) < 50:
             return False
-            
+
         return True
-        
+
     def _should_use_tools(self, content: Optional[str]) -> bool:
         """Determine if tools should be used based on thought content"""
         if not content:
             return False
-            
+
         # Keywords that suggest tool usage is needed
         tool_indicators = [
-            "search", "find", "look up", "browse", "navigate", "execute", 
-            "run", "calculate", "analyze", "process", "extract", "save", 
+            "search", "find", "look up", "browse", "navigate", "execute",
+            "run", "calculate", "analyze", "process", "extract", "save",
             "create", "generate", "check", "verify", "compare", "download",
             "need to", "should", "could", "would", "will", "let's", "let me"
         ]
-        
+
         # If content contains action words but no tools were selected, likely needs tools
         return any(indicator in content.lower() for indicator in tool_indicators)
-        
+
     def _update_thought_history(self, content: Optional[str]) -> None:
         """Update thought history for loop detection"""
         if not content:
             return
-            
+
         # Keep history limited to prevent memory growth
         if len(self.thought_history) >= 10:
             self.thought_history.pop(0)
-            
+
         self.thought_history.append(content)
-        
+
         # Broadcast thought to websocket clients
         if self.websocket:
             self.websocket.broadcast({
@@ -343,16 +346,16 @@ class ToolCallAgent(ReActAgent):
                 'content': content,
                 'timestamp': datetime.now().isoformat()
             })
-        
+
     def _is_in_thought_loop(self) -> bool:
         """Detect if agent is stuck in a thought loop"""
         if len(self.thought_history) < 3:
             return False
-            
+
         # Check for exact repetition
         last_thought = self.thought_history[-1]
         repetition_count = 0
-        
+
         for thought in reversed(self.thought_history[:-1]):
             # Check similarity - exact match or high similarity
             if thought == last_thought:
@@ -367,24 +370,24 @@ class ToolCallAgent(ReActAgent):
             else:
                 # Reset counter if we find a different thought
                 repetition_count = 0
-                
+
         return False
-        
+
     def _calculate_similarity(self, text1: str, text2: str) -> float:
         """Calculate simple similarity between two text strings
-        
+
         This is a simplified version that doesn't require external libraries.
         Returns a value between 0 (completely different) and 1 (identical).
         """
         # Convert to lowercase and split into words
         words1 = set(text1.lower().split())
         words2 = set(text2.lower().split())
-        
+
         # Calculate Jaccard similarity
         if not words1 or not words2:
             return 0.0
-            
+
         intersection = len(words1.intersection(words2))
         union = len(words1.union(words2))
-        
+
         return intersection / union if union > 0 else 0.0

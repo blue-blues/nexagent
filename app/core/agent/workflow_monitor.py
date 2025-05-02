@@ -5,8 +5,8 @@ import asyncio
 import json
 
 from app.agent.base import BaseAgent
-from app.agent.workflow_generator import WorkflowStep
-from app.tool.base import ToolResult
+from app.core.agent.workflow_generator import WorkflowStep
+from app.tools.base import ToolResult
 from app.logger import logger
 
 class ExecutionMetrics(BaseModel):
@@ -68,7 +68,7 @@ class WorkflowMonitor:
                 status="pending"
             ) for step in steps
         ]
-        
+
         # Start telemetry collection with proper cleanup
         task = asyncio.create_task(self._collect_telemetry(workflow_id))
         task.add_done_callback(lambda t: self._cleanup_workflow(workflow_id))
@@ -120,14 +120,14 @@ class WorkflowMonitor:
         for attempt in range(max_retries):
             execution.metrics.retry_count += 1
             delay = base_delay * (2 ** attempt)
-            
+
             logger.info(
                 f"Retrying step {execution.step.step_id} in workflow {workflow_id} "
                 f"after {delay} seconds (attempt {attempt + 1}/{max_retries})"
             )
-            
+
             await asyncio.sleep(delay)
-            
+
             try:
                 result = await self.agent.available_tools.execute(
                     name=execution.step.tool_name,
@@ -171,7 +171,7 @@ class WorkflowMonitor:
                         current_metrics = self._calculate_step_metrics(execution)
                         cognitive_metrics = self._assess_cognitive_load(execution)
                         resource_metrics = self._get_resource_usage()
-                        
+
                         # Update execution metrics with cognitive assessment
                         execution.metrics.cognitive_load = cognitive_metrics["cognitive_load"]
                         execution.metrics.context_switches = cognitive_metrics["context_switches"]
@@ -179,7 +179,7 @@ class WorkflowMonitor:
                         execution.metrics.resource_efficiency = self._calculate_resource_efficiency(
                             cognitive_metrics, resource_metrics
                         )
-                        
+
                         self.telemetry_buffer.append({
                             "workflow_id": workflow_id,
                             "step_id": execution.step.step_id,
@@ -192,7 +192,7 @@ class WorkflowMonitor:
 
                         # Dynamic resource allocation based on cognitive load
                         await self._optimize_resource_allocation(execution, cognitive_metrics)
-                        
+
                         # Proactive performance optimization
                         if execution.metrics.cognitive_load > self.performance_thresholds["cognitive_load_threshold"]:
                             await self._optimize_step_performance(execution, current_metrics)
@@ -219,7 +219,7 @@ class WorkflowMonitor:
                     await task
                 except asyncio.CancelledError:
                     pass
-        
+
         # Clean up transports
         for transport in self.transports:
             if not transport.is_closing():
@@ -235,18 +235,18 @@ class WorkflowMonitor:
             # Aggregate telemetry data with cognitive metrics
             aggregated_data = self._aggregate_telemetry_data()
             cognitive_patterns = self._analyze_cognitive_patterns(aggregated_data)
-            
+
             # Analyze performance trends and resource efficiency
             performance_trends = self._analyze_performance_trends(aggregated_data)
             resource_efficiency = self._analyze_resource_efficiency(aggregated_data)
-            
+
             # Generate optimization recommendations
             recommendations = self._generate_optimization_recommendations(
                 cognitive_patterns,
                 performance_trends,
                 resource_efficiency
             )
-            
+
             # Log enhanced telemetry data with cognitive insights
             logger.info(
                 f"Flushing {len(self.telemetry_buffer)} telemetry records\n"
@@ -255,13 +255,13 @@ class WorkflowMonitor:
                 f"Resource Efficiency: {json.dumps(resource_efficiency, indent=2)}\n"
                 f"Optimization Recommendations: {json.dumps(recommendations, indent=2)}"
             )
-            
+
             # Store historical data for trend analysis
             self._update_historical_metrics(aggregated_data)
-            
+
             # Update resource allocation based on cognitive patterns
             await self._update_resource_pool(cognitive_patterns, resource_efficiency)
-            
+
             self.telemetry_buffer.clear()
         except Exception as e:
             logger.error(f"Error flushing telemetry: {e}")

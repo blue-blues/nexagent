@@ -9,8 +9,8 @@ from typing import Dict, List, Optional, Tuple, Any, Union
 
 from pydantic import BaseModel, Field
 
-from app.tool.base import BaseTool, ToolResult
-from app.tool.enhanced_browser_tool import EnhancedBrowserTool
+from app.tools.base import BaseTool, ToolResult
+from app.tools.enhanced_browser_tool import EnhancedBrowserTool
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')

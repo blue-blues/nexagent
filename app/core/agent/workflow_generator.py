@@ -4,7 +4,7 @@ import json
 
 from app.agent.base import BaseAgent
 from app.schema import Message
-from app.tool.base import ToolResult
+from app.tools.base import ToolResult
 
 class WorkflowStep(BaseModel):
     """Represents a single step in a workflow with validation and dependencies."""

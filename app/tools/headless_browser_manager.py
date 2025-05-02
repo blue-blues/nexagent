@@ -8,8 +8,8 @@ from browser_use.browser.browser import ProxySettings
 from browser_use.browser.context import BrowserContext, BrowserContextConfig
 
 from app.config import config
-from app.tool.proxy_manager import proxy_manager, Proxy
-from app.tool.captcha_handler import captcha_handler
+from app.tools.proxy_manager import proxy_manager, Proxy
+from app.tools.captcha_handler import captcha_handler
 
 logger = logging.getLogger(__name__)
 

@@ -5,11 +5,23 @@ allows the agent to remain active after completing a task and
 prompt the user for additional input.
 """
 
-from typing import Any, Optional
+from typing import Optional
 
 from app.logger import logger
 from app.session import session_manager
-from app.tool.base import BaseTool
+# Try to import BaseTool from different locations
+try:
+    from app.tools.base import BaseTool
+except ImportError:
+    try:
+        from app.core.tool.base import BaseTool
+    except ImportError:
+        # Define a minimal BaseTool class if both imports fail
+        class BaseTool:
+            """Fallback BaseTool implementation."""
+            name = "base_tool"
+            description = "Base tool class"
+            parameters = {}
 from app.util.response_formatter import format_response
 
 

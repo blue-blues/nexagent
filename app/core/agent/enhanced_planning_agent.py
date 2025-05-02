@@ -21,9 +21,9 @@ from app.prompt.enhanced_planning import (
 )
 from app.schema import Message, ToolChoice
 from app.tool import ToolCollection
-from app.tool.planning import PlanningTool
-from app.tool.terminate import Terminate
-from app.tool.input_parser import InputParser
+from app.tools.planning import PlanningTool
+from app.tools.terminate import Terminate
+from app.tools.input_parser import InputParser
 from app.logger import logger
 
 

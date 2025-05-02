@@ -16,8 +16,8 @@ from app.agent.base import BaseAgent
 from app.agent.toolcall import ToolCallAgent
 from app.schema import Message, AgentState, ToolChoice
 from app.tool import ToolCollection
-from app.tool.terminate import Terminate
-from app.tool.state_visualizer import StateVisualizer
+from app.tools.terminate import Terminate
+from app.tools.state_visualizer import StateVisualizer
 from app.state.agent_state_tracker import AgentStateTracker, ActionType
 from app.logger import logger
 

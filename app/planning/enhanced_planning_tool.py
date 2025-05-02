@@ -6,8 +6,8 @@ This module extends the PlanningTool with visualization capabilities.
 
 from typing import Dict, List, Literal, Optional, Any, Union
 
-from app.tool.planning import PlanningTool
-from app.tool.base import ToolResult
+from app.tools.planning import PlanningTool
+from app.tools.base import ToolResult
 from app.exceptions import ToolError
 from app.logger import logger
 from app.planning.visualization import PlanVisualizer

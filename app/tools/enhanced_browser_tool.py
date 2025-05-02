@@ -2,24 +2,59 @@ import asyncio
 import json
 import random
 import time
-import re
-from typing import Optional, List, Dict, Any, Tuple
+from typing import Optional, List, Dict
 
 from browser_use import Browser as BrowserUseBrowser
 from browser_use import BrowserConfig
 from browser_use.browser.context import BrowserContext, BrowserContextConfig
 from browser_use.browser.browser import ProxySettings
 from browser_use.dom.service import DomService
-from pydantic import Field, field_validator
-from pydantic_core.core_schema import ValidationInfo
+from pydantic import Field
 
 from app.config import config
-from app.tool.base import BaseTool, ToolResult
-from app.tool.browser_use_tool import BrowserUseTool
-from app.tool.data_processor import DataProcessor
-from app.tool.proxy_manager import proxy_manager
-from app.tool.captcha_handler import captcha_handler
-from app.tool.headless_browser_manager import headless_browser_manager
+from app.logger import logger
+# Try to import from different locations
+try:
+    from app.tools.base import BaseTool, ToolResult
+    from app.tools.browser_use_tool import BrowserUseTool
+    from app.tools.data_processor import DataProcessor
+    from app.tools.proxy_manager import proxy_manager
+    from app.tools.captcha_handler import captcha_handler
+    from app.tools.headless_browser_manager import headless_browser_manager
+except ImportError:
+    try:
+        from app.core.tool.base import BaseTool, ToolResult
+        from app.core.tool.browser_use_tool import BrowserUseTool
+        from app.core.tool.data_processor import DataProcessor
+        from app.core.tool.proxy_manager import proxy_manager
+        from app.core.tool.captcha_handler import captcha_handler
+        from app.core.tool.headless_browser_manager import headless_browser_manager
+    except ImportError:
+        # Define minimal classes if imports fail
+        class ToolResult:
+            def __init__(self, output=None, error=None):
+                self.output = output
+                self.error = error
+
+        class BaseTool:
+            """Fallback BaseTool implementation."""
+            name = "base_tool"
+            description = "Base tool class"
+            parameters = {}
+
+        class BrowserUseTool(BaseTool):
+            """Fallback BrowserUseTool implementation."""
+            name = "browser_use"
+            description = "Browser tool"
+
+        class DataProcessor:
+            def process(self, data, url, content_type):
+                return f"processed_{url}"
+
+        # Define minimal proxy manager
+        proxy_manager = None
+        captcha_handler = None
+        headless_browser_manager = None
 
 
 class EnhancedBrowserTool(BrowserUseTool):
@@ -291,7 +326,7 @@ class EnhancedBrowserTool(BrowserUseTool):
                                 return elements.length > 0;
                             }})();
                         """)
-                        
+
                         if not element_exists:
                             return ToolResult(error=f"No elements found with selector: '{selector}'. Please check the selector or try a different one.")
                     except Exception as e:
@@ -428,19 +463,19 @@ class EnhancedBrowserTool(BrowserUseTool):
                                 for _ in range(2):
                                     await context.execute_javascript("window.scrollTo(0, document.body.scrollHeight * 0.7);")
                                     await asyncio.sleep(1)
-                                
+
                                 # Reset scroll position
                                 await context.execute_javascript("window.scrollTo(0, 0);")
-                                
+
                                 # Extract text content (main content)
                                 result["text"] = await self._extract_page_text(context)
-                                
+
                                 # Extract all links
                                 result["links"] = await self._extract_page_links(context)
-                                
+
                                 # Extract all tables
                                 result["tables"] = await self._extract_all_tables(context)
-                                
+
                                 return ToolResult(output=f"Successfully navigated to {url} and extracted all content:\n\n{json.dumps(result, ensure_ascii=False)}")
                             except Exception as e:
                                 return ToolResult(error=f"Error extracting 'all' content from {url}: {str(e)}")

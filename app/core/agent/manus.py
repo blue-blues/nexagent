@@ -5,10 +5,10 @@ from pydantic import Field
 from app.agent.toolcall import ToolCallAgent
 from app.prompt.manus import NEXT_STEP_PROMPT, SYSTEM_PROMPT
 from app.tool import Terminate, ToolCollection
-from app.tool.browser_use_tool import BrowserUseTool
-from app.tool.file_saver import FileSaver
-from app.tool.python_execute import PythonExecute
-from app.tool.web_search import WebSearch
+from app.tools.browser_use_tool import BrowserUseTool
+from app.tools.file_saver import FileSaver
+from app.tools.python_execute import PythonExecute
+from app.tools.web_search import WebSearch
 
 
 class Nexagent(ToolCallAgent):

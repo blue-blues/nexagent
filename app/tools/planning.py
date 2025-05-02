@@ -4,7 +4,7 @@ import datetime
 from typing import Dict, List, Literal, Optional, Any
 
 from app.exceptions import ToolError
-from app.tool.base import BaseTool, ToolResult
+from app.tools.base import BaseTool, ToolResult
 from app.logger import logger
 
 
@@ -192,47 +192,230 @@ class PlanningTool(BaseTool):
         """
 
         try:
+            # Check for required parameters based on command
             if command == "create":
+                if not plan_id:
+                    # Generate a plan ID if not provided
+                    import uuid
+                    plan_id = f"plan_{uuid.uuid4().hex[:8]}"
+                    logger.info(f"Auto-generated plan ID: {plan_id}")
+
+                if not title:
+                    raise ToolError("Parameter `title` is required for command: create")
+
                 return self._create_plan(plan_id, title, description, steps, step_dependencies)
             elif command == "update":
+                if not plan_id:
+                    # Try to use the active plan if available
+                    if self._current_plan_id:
+                        plan_id = self._current_plan_id
+                        logger.info(f"Using active plan ID: {plan_id}")
+                    else:
+                        raise ToolError("Parameter `plan_id` is required for command: update")
+
                 return self._update_plan(plan_id, title, description, steps, step_dependencies)
             elif command == "list":
                 return self._list_plans()
             elif command == "get":
+                # If no plan_id is provided, use the active plan
+                if not plan_id and self._current_plan_id:
+                    plan_id = self._current_plan_id
+                    logger.info(f"Using active plan ID: {plan_id}")
+
                 return self._get_plan(plan_id)
             elif command == "set_active":
+                if not plan_id:
+                    raise ToolError("Parameter `plan_id` is required for command: set_active")
+
                 return self._set_active_plan(plan_id)
             elif command == "delete":
+                if not plan_id:
+                    raise ToolError("Parameter `plan_id` is required for command: delete")
+
                 return self._delete_plan(plan_id)
             elif command == "create_version":
+                if not plan_id:
+                    # Try to use the active plan if available
+                    if self._current_plan_id:
+                        plan_id = self._current_plan_id
+                        logger.info(f"Using active plan ID: {plan_id}")
+                    else:
+                        raise ToolError("Parameter `plan_id` is required for command: create_version")
+
                 return self._create_version(plan_id, version_id, version_description)
             elif command == "list_versions":
+                if not plan_id:
+                    # Try to use the active plan if available
+                    if self._current_plan_id:
+                        plan_id = self._current_plan_id
+                        logger.info(f"Using active plan ID: {plan_id}")
+                    else:
+                        raise ToolError("Parameter `plan_id` is required for command: list_versions")
+
                 return self._list_versions(plan_id)
             elif command == "get_version":
+                if not plan_id:
+                    # Try to use the active plan if available
+                    if self._current_plan_id:
+                        plan_id = self._current_plan_id
+                        logger.info(f"Using active plan ID: {plan_id}")
+                    else:
+                        raise ToolError("Parameter `plan_id` is required for command: get_version")
+
+                if not version_id:
+                    raise ToolError("Parameter `version_id` is required for command: get_version")
+
                 return self._get_version(plan_id, version_id)
             elif command == "compare_versions":
+                if not plan_id:
+                    # Try to use the active plan if available
+                    if self._current_plan_id:
+                        plan_id = self._current_plan_id
+                        logger.info(f"Using active plan ID: {plan_id}")
+                    else:
+                        raise ToolError("Parameter `plan_id` is required for command: compare_versions")
+
+                if not version_id:
+                    raise ToolError("Parameter `version_id` is required for command: compare_versions")
+
+                if not compare_with_version:
+                    raise ToolError("Parameter `compare_with_version` is required for command: compare_versions")
+
                 return self._compare_versions(plan_id, version_id, compare_with_version)
             elif command == "rollback":
+                if not plan_id:
+                    # Try to use the active plan if available
+                    if self._current_plan_id:
+                        plan_id = self._current_plan_id
+                        logger.info(f"Using active plan ID: {plan_id}")
+                    else:
+                        raise ToolError("Parameter `plan_id` is required for command: rollback")
+
+                if not version_id:
+                    raise ToolError("Parameter `version_id` is required for command: rollback")
+
                 return self._rollback_to_version(plan_id, version_id)
             elif command == "parse_intent":
+                if not user_input:
+                    raise ToolError("Parameter `user_input` is required for command: parse_intent")
+
                 return self._parse_intent(user_input)
             elif command == "validate_plan":
+                if not plan_id:
+                    # Try to use the active plan if available
+                    if self._current_plan_id:
+                        plan_id = self._current_plan_id
+                        logger.info(f"Using active plan ID: {plan_id}")
+                    else:
+                        raise ToolError("Parameter `plan_id` is required for command: validate_plan")
+
                 return self._validate_plan(plan_id)
             elif command == "optimize_plan":
+                if not plan_id:
+                    # Try to use the active plan if available
+                    if self._current_plan_id:
+                        plan_id = self._current_plan_id
+                        logger.info(f"Using active plan ID: {plan_id}")
+                    else:
+                        raise ToolError("Parameter `plan_id` is required for command: optimize_plan")
+
                 return self._optimize_plan(plan_id)
             elif command == "branch":
+                if not plan_id:
+                    # Try to use the active plan if available
+                    if self._current_plan_id:
+                        plan_id = self._current_plan_id
+                        logger.info(f"Using active plan ID: {plan_id}")
+                    else:
+                        raise ToolError("Parameter `plan_id` is required for command: branch")
+
+                if not branch_name:
+                    raise ToolError("Parameter `branch_name` is required for command: branch")
+
                 return self._create_branch(plan_id, branch_name)
             elif command == "merge":
+                if not plan_id:
+                    # Try to use the active plan if available
+                    if self._current_plan_id:
+                        plan_id = self._current_plan_id
+                        logger.info(f"Using active plan ID: {plan_id}")
+                    else:
+                        raise ToolError("Parameter `plan_id` is required for command: merge")
+
+                if not branch_name:
+                    raise ToolError("Parameter `branch_name` is required for command: merge")
+
+                if not target_branch:
+                    raise ToolError("Parameter `target_branch` is required for command: merge")
+
                 return self._merge_branch(plan_id, branch_name, target_branch, conflict_resolution)
             elif command == "analyze_dependencies":
+                if not plan_id:
+                    # Try to use the active plan if available
+                    if self._current_plan_id:
+                        plan_id = self._current_plan_id
+                        logger.info(f"Using active plan ID: {plan_id}")
+                    else:
+                        raise ToolError("Parameter `plan_id` is required for command: analyze_dependencies")
+
                 return self._analyze_dependencies(plan_id)
             elif command == "tag_version":
+                if not plan_id:
+                    # Try to use the active plan if available
+                    if self._current_plan_id:
+                        plan_id = self._current_plan_id
+                        logger.info(f"Using active plan ID: {plan_id}")
+                    else:
+                        raise ToolError("Parameter `plan_id` is required for command: tag_version")
+
+                if not version_id:
+                    raise ToolError("Parameter `version_id` is required for command: tag_version")
+
+                if not tag_name:
+                    raise ToolError("Parameter `tag_name` is required for command: tag_version")
+
                 return self._tag_version(plan_id, version_id, tag_name)
             elif command == "get_version_history":
+                if not plan_id:
+                    # Try to use the active plan if available
+                    if self._current_plan_id:
+                        plan_id = self._current_plan_id
+                        logger.info(f"Using active plan ID: {plan_id}")
+                    else:
+                        raise ToolError("Parameter `plan_id` is required for command: get_version_history")
+
                 return self._get_version_history(plan_id)
             elif command == "fork_version":
+                if not plan_id:
+                    # Try to use the active plan if available
+                    if self._current_plan_id:
+                        plan_id = self._current_plan_id
+                        logger.info(f"Using active plan ID: {plan_id}")
+                    else:
+                        raise ToolError("Parameter `plan_id` is required for command: fork_version")
+
+                if not version_id:
+                    raise ToolError("Parameter `version_id` is required for command: fork_version")
+
+                if not fork_name:
+                    raise ToolError("Parameter `fork_name` is required for command: fork_version")
+
                 return self._fork_version(plan_id, version_id, fork_name)
             elif command == "merge_versions":
+                if not plan_id:
+                    # Try to use the active plan if available
+                    if self._current_plan_id:
+                        plan_id = self._current_plan_id
+                        logger.info(f"Using active plan ID: {plan_id}")
+                    else:
+                        raise ToolError("Parameter `plan_id` is required for command: merge_versions")
+
+                if not version_id:
+                    raise ToolError("Parameter `version_id` is required for command: merge_versions")
+
+                if not compare_with_version:
+                    raise ToolError("Parameter `compare_with_version` is required for command: merge_versions")
+
                 return self._merge_versions(plan_id, version_id, compare_with_version, merge_strategy)
             else:
                 allowed_commands = "create, update, list, get, set_active, delete, create_version, list_versions, get_version, compare_versions, rollback, parse_intent, validate_plan, optimize_plan, branch, merge, analyze_dependencies, tag_version, get_version_history, fork_version, merge_versions"
@@ -246,16 +429,16 @@ class PlanningTool(BaseTool):
         steps: Optional[List[str]] = None, step_dependencies: Optional[List[List[int]]] = None
     ) -> ToolResult:
         """Create a new plan with the given ID, title, and optional details."""
-        if not plan_id:
-            raise ToolError("Parameter `plan_id` is required for command: create")
+        # plan_id is now guaranteed to be non-None due to the check in execute()
+        assert plan_id is not None, "plan_id should not be None at this point"
 
         if plan_id in self.plans:
             raise ToolError(
                 f"A plan with ID '{plan_id}' already exists. Use 'update' to modify existing plans."
             )
 
-        if not title:
-            raise ToolError("Parameter `title` is required for command: create")
+        # title is now guaranteed to be non-None due to the check in execute()
+        assert title is not None, "title should not be None at this point"
 
         # Create a new plan with enhanced structure
         plan = {

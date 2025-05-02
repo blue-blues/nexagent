@@ -7,7 +7,7 @@ import signal
 from typing import Optional, Tuple
 
 from app.exceptions import ToolError
-from app.tool.base import BaseTool, CLIResult, ToolResult
+from app.tools.base import BaseTool, CLIResult, ToolResult
 from app.logger import logger
 
 

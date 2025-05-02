@@ -3,9 +3,11 @@ import re
 from pydantic import Field
 
 from app.agent.base import BaseAgent
-from app.agent.nexagent import Nexagent
-from app.agent.software_dev_agent import SoftwareDevAgent
-from app.agent.web_output import WebOutputFormatter
+from app.core.agent.nexagent import Nexagent
+from app.core.agent.web_output import WebOutputFormatter
+
+# SoftwareDevAgent is not found, so we'll use TaskBasedNexagent as a fallback
+from app.agent.task_based_nexagent import TaskBasedNexagent as SoftwareDevAgent
 from app.memory.conversation_memory import conversation_memory
 from app.schema import AgentState, Message
 from app.logger import logger
@@ -173,12 +175,12 @@ class IntegratedAgent(BaseAgent):
 
             return f"An error occurred while processing your request: {str(e)}"
 
-    def format_output(self, output: str, is_final_output: bool = False) -> str:
+    def format_output(self, output: str, _is_final_output: bool = False) -> str:
         """Format the output with clear separation between implementation steps and final output.
 
         Args:
             output: The raw output to format
-            is_final_output: Whether this is the final output
+            _is_final_output: Whether this is the final output (unused)
 
         Returns:
             Formatted output with clear sections

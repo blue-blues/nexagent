@@ -5,14 +5,14 @@ from pydantic import Field
 
 from app.agent.toolcall import ToolCallAgent
 from app.tool import ToolCollection
-from app.tool.bash import Bash
-from app.tool.str_replace_editor import StrReplaceEditor
-from app.tool.python_execute import PythonExecute
-from app.tool.terminate import Terminate
-from app.tool.enhanced_browser_tool import EnhancedBrowserTool
-from app.tool.web_search import WebSearch
-from app.tool.code_analyzer import CodeAnalyzer
-from app.tool.long_running_command import LongRunningCommand
+from app.tools.bash import Bash
+from app.tools.str_replace_editor import StrReplaceEditor
+from app.tools.python_execute import PythonExecute
+from app.tools.terminate import Terminate
+from app.tools.enhanced_browser_tool import EnhancedBrowserTool
+from app.tools.web_search import WebSearch
+from app.tools.code_analyzer import CodeAnalyzer
+from app.tools.long_running_command import LongRunningCommand
 from app.schema import Message
 from app.logger import logger
 

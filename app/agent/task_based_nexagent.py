@@ -16,9 +16,18 @@ from app.agent.task_based_agent import Task
 from app.logger import logger
 from app.schema import Message
 from app.tools import ToolCollection
-from app.tools.code import PythonExecute
+from app.timeline.timeline import Timeline
+import uuid
+from app.tools.code import PythonExecute, CodeAnalyzer
 from app.tools.browser import WebSearch, EnhancedBrowserTool
 from app.tools.file_saver import FileSaver
+from app.tools.terminal import Terminal, EnhancedTerminal
+from app.tools.data_processor import DataProcessor
+from app.tools.output_formatter import OutputFormatter
+from app.tools.message_notification import MessageNotifyUser, MessageAskUser
+from app.tools.task_analytics import TaskAnalytics
+from app.tools.planning import Planning
+from app.tools.long_running_command import LongRunningCommand
 from app.tools.terminate import Terminate
 
 
@@ -58,14 +67,40 @@ class TaskBasedNexagent(TaskBasedToolCallAgent):
     system_prompt: str = SYSTEM_PROMPT
     task_prompt: str = TASK_PROMPT
 
-    # Add general-purpose tools to the tool collection
+    # Conversation tracking
+    conversation_id: Optional[str] = Field(default=None, description="ID of the current conversation")
+    user_id: Optional[str] = Field(default=None, description="ID of the current user")
+
+    # Add comprehensive tools to the tool collection
     available_tools: ToolCollection = Field(
         default_factory=lambda: ToolCollection(
+            # Code tools
             PythonExecute(),
+            CodeAnalyzer(),
+
+            # Browser tools
             WebSearch(),
             EnhancedBrowserTool(),
+
+            # File and data tools
             FileSaver(),
-            # TaskAnalytics is not available yet
+            DataProcessor(),
+            OutputFormatter(),
+
+            # Terminal tools
+            Terminal(),
+            EnhancedTerminal(),
+            LongRunningCommand(),
+
+            # User interaction tools
+            MessageNotifyUser(),
+            MessageAskUser(),
+
+            # Planning and analytics tools
+            Planning(),
+            TaskAnalytics(),
+
+            # System tools
             Terminate()
         )
     )
@@ -78,6 +113,27 @@ class TaskBasedNexagent(TaskBasedToolCallAgent):
     thought_history: List[Dict[str, Any]] = Field(
         default_factory=list, description="History of thinking steps"
     )
+
+    # Timeline for tracking agent activities
+    timeline: Timeline = Field(default=None, description="Timeline for tracking agent activities")
+
+    def __init__(self, **data):
+        """Initialize the TaskBasedNexagent."""
+        super().__init__(**data)
+
+        # Initialize conversation ID if not provided
+        if not self.conversation_id:
+            self.conversation_id = str(uuid.uuid4())
+
+        # Initialize timeline if not provided
+        if self.timeline is None:
+            self.timeline = Timeline(
+                conversation_id=self.conversation_id,
+                user_id=self.user_id,
+                metadata={"agent_type": "task_based_nexagent"}
+            )
+
+        logger.info("TaskBasedNexagent initialized with timeline capabilities")
 
     async def _create_initial_tasks(self, request: str) -> None:
         """Create initial tasks from the request by analyzing it and breaking it down."""

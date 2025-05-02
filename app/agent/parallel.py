@@ -14,9 +14,9 @@ from typing import Any, Dict, List, Optional, Set, Tuple, Union
 from pydantic import BaseModel, Field
 
 from app.agent.base import BaseAgent
-from app.agent.toolcall import ToolCallAgent
-from app.agent.workflow_generator import WorkflowStep
-from app.agent.workflow_monitor import WorkflowMonitor
+from app.agent.task_based_toolcall import TaskBasedToolCallAgent
+from app.core.agent.workflow_generator import WorkflowStep
+from app.core.agent.workflow_monitor import WorkflowMonitor
 from app.exceptions import TokenLimitExceeded
 from app.logger import logger
 from app.schema import AgentState, Memory, Message
@@ -359,3 +359,34 @@ class ParallelAgentManager:
         Returns:
             bool: True if the task was cancelled, False otherwise
         """
+        task = self.get_task(task_id)
+        if not task:
+            logger.warning(f"Cannot cancel task {task_id}: task not found")
+            return False
+
+        if task.status != AgentTaskStatus.RUNNING:
+            logger.warning(f"Cannot cancel task {task_id}: task is not running (status: {task.status})")
+            return False
+
+        if task_id in self.running_tasks:
+            # Cancel the asyncio task
+            asyncio_task = self.running_tasks[task_id]
+            asyncio_task.cancel()
+            del self.running_tasks[task_id]
+
+        # Mark task as cancelled
+        task.status = AgentTaskStatus.CANCELLED
+        logger.info(f"Task {task_id} cancelled")
+        return True
+
+    def cancel_all_tasks(self) -> int:
+        """Cancel all running tasks.
+
+        Returns:
+            int: Number of tasks cancelled
+        """
+        cancelled_count = 0
+        for task_id in list(self.running_tasks.keys()):
+            if self.cancel_task(task_id):
+                cancelled_count += 1
+        return cancelled_count

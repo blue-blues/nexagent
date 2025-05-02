@@ -7,13 +7,29 @@ from app.flow.base import BaseFlow
 from app.logger import logger
 from app.memory.conversation_memory import conversation_memory
 from app.memory.memory_reasoning import MemoryReasoning
-from app.tool.output_organizer import OutputOrganizer
+# Import OutputOrganizer with fallback
+try:
+    from app.tools.output_organizer import OutputOrganizer
+except ImportError:
+    # Fallback implementation if the module is not available
+    class OutputOrganizer:
+        async def execute(self, **_):
+            logger.warning("OutputOrganizer not available, skipping output organization")
+            return None
 from app.tools.conversation_file_saver import ConversationFileSaver
 from app.tools.message_classifier import MessageClassifier
 from app.util.direct_response import is_simple_prompt, get_direct_response
 from app.timeline.timeline import Timeline
 from app.timeline.events import create_user_input_event, create_agent_response_event, create_system_event
-from app.tool.base import ToolResult
+# Define ToolResult if not available
+try:
+    from app.tools.base import ToolResult
+except ImportError:
+    # Simple fallback implementation
+    class ToolResult:
+        def __init__(self, output=None, error=None):
+            self.output = output
+            self.error = error
 
 
 class IntegratedFlow(BaseFlow):
@@ -216,7 +232,7 @@ class IntegratedFlow(BaseFlow):
         # If no clear final output section is found, return the original result
         return result
 
-    async def execute(self, input_text: str = None, prompt: str = None, conversation_id: Optional[str] = None, timeline: Optional[Timeline] = None, processing_mode: str = "auto", **kwargs) -> Union[str, ToolResult]:
+    async def execute(self, input_text: str = None, prompt: str = None, conversation_id: Optional[str] = None, timeline: Optional[Timeline] = None, processing_mode: str = "auto", **_) -> Union[str, ToolResult]:
         """
         Execute the integrated flow with the given input.
 
@@ -232,7 +248,8 @@ class IntegratedFlow(BaseFlow):
             conversation_id: Optional conversation ID to use. If provided, it will override
                            the conversation ID set during initialization.
             timeline: Optional timeline to track events. If provided, events will be added to this timeline.
-            kwargs: Additional keyword arguments to pass to the agent
+            processing_mode: Mode to use for processing the input ("auto", "chat", or "agent")
+            **_: Additional keyword arguments (ignored)
 
         Returns:
             str: The result from the appropriate specialized agent or a direct response

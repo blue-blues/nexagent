@@ -4,7 +4,7 @@ import platform
 from typing import Optional
 
 from app.exceptions import ToolError
-from app.tool.base import BaseTool, CLIResult, ToolResult
+from app.tools.base import BaseTool, CLIResult, ToolResult
 from app.config import config
 
 

@@ -8,7 +8,7 @@ from prompt_toolkit import PromptSession
 from prompt_toolkit.completion import WordCompleter
 from prompt_toolkit.formatted_text import FormattedText
 
-from app.tool.base import BaseTool, CLIResult
+from app.tools.base import BaseTool, CLIResult
 
 # Initialize colorama for Windows support
 init()

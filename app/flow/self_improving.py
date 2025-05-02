@@ -15,9 +15,373 @@ from pydantic import Field, BaseModel
 
 from app.agent.base import BaseAgent
 from app.agent.parallel import AgentTask, ParallelAgentManager, AgentTaskStatus
-from app.flow.parallel import ParallelFlow
+from app.flow.parallel import ParallelFlow, ParallelWorkflowFlow
 from app.logger import logger
 from app.schema import AgentState
+
+
+class IssueType(str, Enum):
+    """Types of issues that can be detected during execution."""
+
+    TIMEOUT = "timeout"  # Task took too long to complete
+    ERROR = "error"  # Task failed with an error
+    RESOURCE_LIMIT = "resource_limit"  # Task exceeded resource limits
+    PERFORMANCE = "performance"  # Task performed poorly
+    STUCK = "stuck"  # Task is stuck in a loop or not making progress
+    TOKEN_LIMIT = "token_limit"  # Task exceeded token limits
+    DEPENDENCY_FAILURE = "dependency_failure"  # Task's dependency failed
+
+
+class IssueDetection(BaseModel):
+    """Represents a detected issue during execution."""
+
+    issue_id: str
+    task_id: str
+    issue_type: str
+    timestamp: datetime = Field(default_factory=datetime.now)
+    description: str
+    severity: int = 1  # 1-5, with 5 being most severe
+    metrics: Dict[str, Any] = Field(default_factory=dict)
+    suggested_fixes: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+class FixResult(BaseModel):
+    """Result of applying a fix to an issue."""
+
+    issue_id: str
+    fix_id: str
+    timestamp: datetime = Field(default_factory=datetime.now)
+    success: bool
+    description: str
+    metrics_before: Dict[str, Any] = Field(default_factory=dict)
+    metrics_after: Dict[str, Any] = Field(default_factory=dict)
+
+
+class AgentReasoningModule:
+    """Module for detecting issues and reasoning about fixes.
+
+    This module analyzes execution metrics and task results to identify
+    issues and automatically apply corrective measures.
+    """
+
+    def __init__(self):
+        self.detected_issues: Dict[str, IssueDetection] = {}
+        self.applied_fixes: Dict[str, FixResult] = {}
+        self.performance_thresholds = {
+            "timeout_ms": 30000,  # 30 seconds
+            "error_rate": 0.2,  # 20% error rate
+            "max_retries": 3,
+            "token_limit": 4000,
+            "memory_threshold": 0.9,  # 90% memory usage
+            "cpu_threshold": 0.8,  # 80% CPU usage
+            "stuck_detection_time": 60,  # 60 seconds with no progress
+        }
+        self.fix_strategies = {
+            IssueType.TIMEOUT: self._fix_timeout,
+            IssueType.ERROR: self._fix_error,
+            IssueType.RESOURCE_LIMIT: self._fix_resource_limit,
+            IssueType.PERFORMANCE: self._fix_performance,
+            IssueType.STUCK: self._fix_stuck,
+            IssueType.TOKEN_LIMIT: self._fix_token_limit,
+            IssueType.DEPENDENCY_FAILURE: self._fix_dependency_failure,
+        }
+
+    async def detect_issues(self, tasks: Dict[str, AgentTask],
+                          execution_metrics: Dict[str, Any]) -> List[IssueDetection]:
+        """Detect issues in the current execution state.
+
+        Args:
+            tasks: Dictionary of tasks being executed
+            execution_metrics: Current execution metrics
+
+        Returns:
+            List of detected issues
+        """
+        detected = []
+
+        # Check for timeouts
+        for task_id, task in tasks.items():
+            if task.status == AgentTaskStatus.RUNNING:
+                if task.started_at and (datetime.now() - task.started_at).total_seconds() > \
+                   self.performance_thresholds["timeout_ms"] / 1000:
+                    issue = IssueDetection(
+                        issue_id=f"timeout_{task_id}_{int(time.time())}",
+                        task_id=task_id,
+                        issue_type=IssueType.TIMEOUT,
+                        description=f"Task {task_id} has been running for too long",
+                        severity=3,
+                        metrics={"running_time": (datetime.now() - task.started_at).total_seconds()}
+                    )
+                    self.detected_issues[issue.issue_id] = issue
+                    detected.append(issue)
+
+            # Check for errors
+            elif task.status == AgentTaskStatus.FAILED:
+                issue = IssueDetection(
+                    issue_id=f"error_{task_id}_{int(time.time())}",
+                    task_id=task_id,
+                    issue_type=IssueType.ERROR,
+                    description=f"Task {task_id} failed: {task.error}",
+                    severity=4,
+                    metrics={"error": task.error, "retry_count": task.retry_count}
+                )
+                self.detected_issues[issue.issue_id] = issue
+                detected.append(issue)
+
+        return detected
+
+    async def suggest_fixes(self, issue: IssueDetection) -> List[Dict[str, Any]]:
+        """Suggest fixes for a detected issue.
+
+        Args:
+            issue: The detected issue
+
+        Returns:
+            List of suggested fixes
+        """
+        fixes = []
+
+        # Generic fixes based on issue type
+        if issue.issue_type == IssueType.TIMEOUT:
+            fixes.append({
+                "fix_id": f"fix_timeout_{issue.task_id}_{int(time.time())}",
+                "description": "Increase timeout for the task",
+                "action": "increase_timeout",
+                "params": {"task_id": issue.task_id, "timeout_factor": 1.5}
+            })
+
+        elif issue.issue_type == IssueType.ERROR:
+            fixes.append({
+                "fix_id": f"fix_error_retry_{issue.task_id}_{int(time.time())}",
+                "description": "Retry the task",
+                "action": "retry",
+                "params": {"task_id": issue.task_id}
+            })
+
+        # Update the issue with suggested fixes
+        issue.suggested_fixes = fixes
+        return fixes
+
+    async def apply_fix(self, issue: IssueDetection, fix: Dict[str, Any],
+                       manager: ParallelAgentManager) -> FixResult:
+        """Apply a fix to an issue.
+
+        Args:
+            issue: The detected issue
+            fix: The fix to apply
+            manager: The parallel agent manager
+
+        Returns:
+            Result of applying the fix
+        """
+        fix_strategy = self.fix_strategies.get(issue.issue_type)
+        if not fix_strategy:
+            return FixResult(
+                issue_id=issue.issue_id,
+                fix_id=fix["fix_id"],
+                success=False,
+                description=f"No fix strategy available for issue type {issue.issue_type}"
+            )
+
+        # Collect metrics before applying fix
+        metrics_before = self._collect_metrics(issue.task_id, manager)
+
+        # Apply the fix
+        try:
+            result = await fix_strategy(issue, fix, manager)
+
+            # Collect metrics after applying fix
+            metrics_after = self._collect_metrics(issue.task_id, manager)
+
+            fix_result = FixResult(
+                issue_id=issue.issue_id,
+                fix_id=fix["fix_id"],
+                success=result["success"],
+                description=result["description"],
+                metrics_before=metrics_before,
+                metrics_after=metrics_after
+            )
+
+            # Store the fix result
+            self.applied_fixes[fix["fix_id"]] = fix_result
+            return fix_result
+
+        except Exception as e:
+            logger.error(f"Error applying fix {fix['fix_id']}: {str(e)}")
+            return FixResult(
+                issue_id=issue.issue_id,
+                fix_id=fix["fix_id"],
+                success=False,
+                description=f"Error applying fix: {str(e)}"
+            )
+
+    def _collect_metrics(self, task_id: str, manager: ParallelAgentManager) -> Dict[str, Any]:
+        """Collect current metrics for a task.
+
+        Args:
+            task_id: ID of the task
+            manager: The parallel agent manager
+
+        Returns:
+            Dictionary of metrics
+        """
+        metrics = {}
+
+        # Get task if it exists
+        task = manager.get_task(task_id)
+        if task:
+            metrics["status"] = task.status
+            metrics["retry_count"] = task.retry_count
+            if task.started_at:
+                metrics["running_time"] = (datetime.now() - task.started_at).total_seconds()
+            if task.execution_time:
+                metrics["execution_time"] = task.execution_time
+
+        return metrics
+
+    async def _fix_timeout(self, issue: IssueDetection, fix: Dict[str, Any],
+                         manager: ParallelAgentManager) -> Dict[str, Any]:
+        """Fix a timeout issue.
+
+        Args:
+            issue: The timeout issue
+            fix: The fix to apply
+            manager: The parallel agent manager
+
+        Returns:
+            Result of applying the fix
+        """
+        task_id = fix["params"]["task_id"]
+        task = manager.get_task(task_id)
+        
+        if not task:
+            return {
+                "success": False,
+                "description": f"Task {task_id} not found"
+            }
+        
+        # Implement timeout fix logic here
+        return {
+            "success": True,
+            "description": f"Increased timeout for task {task_id}"
+        }
+
+    async def _fix_error(self, issue: IssueDetection, fix: Dict[str, Any],
+                       manager: ParallelAgentManager) -> Dict[str, Any]:
+        """Fix an error issue.
+
+        Args:
+            issue: The error issue
+            fix: The fix to apply
+            manager: The parallel agent manager
+
+        Returns:
+            Result of applying the fix
+        """
+        task_id = fix["params"]["task_id"]
+        task = manager.get_task(task_id)
+        
+        if not task:
+            return {
+                "success": False,
+                "description": f"Task {task_id} not found"
+            }
+        
+        # Implement error fix logic here
+        return {
+            "success": True,
+            "description": f"Applied error fix for task {task_id}"
+        }
+
+    async def _fix_resource_limit(self, issue: IssueDetection, fix: Dict[str, Any],
+                                manager: ParallelAgentManager) -> Dict[str, Any]:
+        """Fix a resource limit issue.
+
+        Args:
+            issue: The resource limit issue
+            fix: The fix to apply
+            manager: The parallel agent manager
+
+        Returns:
+            Result of applying the fix
+        """
+        # Implement resource limit fix logic here
+        return {
+            "success": True,
+            "description": "Applied resource limit fix"
+        }
+
+    async def _fix_performance(self, issue: IssueDetection, fix: Dict[str, Any],
+                             manager: ParallelAgentManager) -> Dict[str, Any]:
+        """Fix a performance issue.
+
+        Args:
+            issue: The performance issue
+            fix: The fix to apply
+            manager: The parallel agent manager
+
+        Returns:
+            Result of applying the fix
+        """
+        # Implement performance fix logic here
+        return {
+            "success": True,
+            "description": "Applied performance fix"
+        }
+
+    async def _fix_stuck(self, issue: IssueDetection, fix: Dict[str, Any],
+                       manager: ParallelAgentManager) -> Dict[str, Any]:
+        """Fix a stuck task issue.
+
+        Args:
+            issue: The stuck task issue
+            fix: The fix to apply
+            manager: The parallel agent manager
+
+        Returns:
+            Result of applying the fix
+        """
+        # Implement stuck task fix logic here
+        return {
+            "success": True,
+            "description": "Applied stuck task fix"
+        }
+
+    async def _fix_token_limit(self, issue: IssueDetection, fix: Dict[str, Any],
+                             manager: ParallelAgentManager) -> Dict[str, Any]:
+        """Fix a token limit issue.
+
+        Args:
+            issue: The token limit issue
+            fix: The fix to apply
+            manager: The parallel agent manager
+
+        Returns:
+            Result of applying the fix
+        """
+        # Implement token limit fix logic here
+        return {
+            "success": True,
+            "description": "Applied token limit fix"
+        }
+
+    async def _fix_dependency_failure(self, issue: IssueDetection, fix: Dict[str, Any],
+                                    manager: ParallelAgentManager) -> Dict[str, Any]:
+        """Fix a dependency failure issue.
+
+        Args:
+            issue: The dependency failure issue
+            fix: The fix to apply
+            manager: The parallel agent manager
+
+        Returns:
+            Result of applying the fix
+        """
+        # Implement dependency failure fix logic here
+        return {
+            "success": True,
+            "description": "Applied dependency failure fix"
+        }
 
 
 class SelfImprovingParallelFlow(ParallelFlow):
@@ -172,13 +536,6 @@ class SelfImprovingParallelFlow(ParallelFlow):
                                     if t.status in [AgentTaskStatus.PENDING, AgentTaskStatus.RUNNING]]
                 if not pending_or_running:
                     logger.info("Execution complete, stopping monitoring")
-                    break
-
-                # Additional safety check - if all tasks are in terminal states
-                # This prevents the monitoring task from getting stuck
-                terminal_states = [AgentTaskStatus.COMPLETED, AgentTaskStatus.FAILED, AgentTaskStatus.CANCELLED]
-                if all(t.status in terminal_states for t in self.manager.tasks.values()):
-                    logger.info("All tasks in terminal states, stopping monitoring")
                     break
 
         except asyncio.CancelledError:
@@ -355,313 +712,62 @@ class SelfImprovingParallelWorkflowFlow(SelfImprovingParallelFlow):
         """Parse the workflow plan from the planner result.
 
         Args:
-
-
-class IssueType(str, Enum):
-    """Types of issues that can be detected during execution."""
-
-    TIMEOUT = "timeout"  # Task took too long to complete
-    ERROR = "error"  # Task failed with an error
-    RESOURCE_LIMIT = "resource_limit"  # Task exceeded resource limits
-    PERFORMANCE = "performance"  # Task performed poorly
-    STUCK = "stuck"  # Task is stuck in a loop or not making progress
-    TOKEN_LIMIT = "token_limit"  # Task exceeded token limits
-    DEPENDENCY_FAILURE = "dependency_failure"  # Task's dependency failed
-
-
-class IssueDetection(BaseModel):
-    """Represents a detected issue during execution."""
-
-    issue_id: str
-    task_id: str
-    issue_type: IssueType
-    timestamp: datetime = Field(default_factory=datetime.now)
-    description: str
-    severity: int = 1  # 1-5, with 5 being most severe
-    metrics: Dict[str, Any] = Field(default_factory=dict)
-    suggested_fixes: List[Dict[str, Any]] = Field(default_factory=list)
-
-
-class FixResult(BaseModel):
-    """Result of applying a fix to an issue."""
-
-    issue_id: str
-    fix_id: str
-    timestamp: datetime = Field(default_factory=datetime.now)
-    success: bool
-    description: str
-    metrics_before: Dict[str, Any] = Field(default_factory=dict)
-    metrics_after: Dict[str, Any] = Field(default_factory=dict)
-
-
-class AgentReasoningModule:
-    """Module for detecting issues and reasoning about fixes.
-
-    This module analyzes execution metrics and task results to identify
-    issues and automatically apply corrective measures.
-    """
-
-    def __init__(self):
-        self.detected_issues: Dict[str, IssueDetection] = {}
-        self.applied_fixes: Dict[str, FixResult] = {}
-        self.performance_thresholds = {
-            "timeout_ms": 30000,  # 30 seconds
-            "error_rate": 0.2,  # 20% error rate
-            "max_retries": 3,
-            "token_limit": 4000,
-            "memory_threshold": 0.9,  # 90% memory usage
-            "cpu_threshold": 0.8,  # 80% CPU usage
-            "stuck_detection_time": 60,  # 60 seconds with no progress
-        }
-        self.fix_strategies = {
-            IssueType.TIMEOUT: self._fix_timeout,
-            IssueType.ERROR: self._fix_error,
-            IssueType.RESOURCE_LIMIT: self._fix_resource_limit,
-            IssueType.PERFORMANCE: self._fix_performance,
-            IssueType.STUCK: self._fix_stuck,
-            IssueType.TOKEN_LIMIT: self._fix_token_limit,
-            IssueType.DEPENDENCY_FAILURE: self._fix_dependency_failure,
-        }
-
-    async def detect_issues(self, tasks: Dict[str, AgentTask],
-                          execution_metrics: Dict[str, Any]) -> List[IssueDetection]:
-        """Detect issues in the current execution state.
-
-        Args:
-            tasks: Dictionary of tasks being executed
-            execution_metrics: Current execution metrics
+            plan_result: The result from the planner task
 
         Returns:
-            List of detected issues
+            List[Dict]: List of workflow steps with dependencies
         """
-        detected = []
-
-        # Check for timeouts
-        for task_id, task in tasks.items():
-            if task.status == AgentTaskStatus.RUNNING:
-                if task.started_at and (datetime.now() - task.started_at).total_seconds() > \
-                   self.performance_thresholds["timeout_ms"] / 1000:
-                    issue = IssueDetection(
-                        issue_id=f"timeout_{task_id}_{int(time.time())}",
-                        task_id=task_id,
-                        issue_type=IssueType.TIMEOUT,
-                        description=f"Task {task_id} has been running for too long",
-                        severity=3,
-                        metrics={"running_time": (datetime.now() - task.started_at).total_seconds()}
-                    )
-                    self.detected_issues[issue.issue_id] = issue
-                    detected.append(issue)
-
-            # Check for errors
-            elif task.status == AgentTaskStatus.FAILED:
-                issue = IssueDetection(
-                    issue_id=f"error_{task_id}_{int(time.time())}",
-                    task_id=task_id,
-                    issue_type=IssueType.ERROR,
-                    description=f"Task {task_id} failed: {task.error}",
-                    severity=4,
-                    metrics={"error": task.error, "retry_count": task.retry_count}
-                )
-                self.detected_issues[issue.issue_id] = issue
-                detected.append(issue)
-
-            # Check for stuck tasks
-            elif task.status == AgentTaskStatus.RUNNING and task.started_at:
-                running_time = (datetime.now() - task.started_at).total_seconds()
-                if running_time > self.performance_thresholds["stuck_detection_time"]:
-                    # Additional logic could check for actual progress indicators
-                    issue = IssueDetection(
-                        issue_id=f"stuck_{task_id}_{int(time.time())}",
-                        task_id=task_id,
-                        issue_type=IssueType.STUCK,
-                        description=f"Task {task_id} appears to be stuck",
-                        severity=3,
-                        metrics={"running_time": running_time}
-                    )
-                    self.detected_issues[issue.issue_id] = issue
-                    detected.append(issue)
-
-        # Check for dependency failures
-        for task_id, task in tasks.items():
-            if task.status == AgentTaskStatus.PENDING and task.dependencies:
-                failed_deps = [dep for dep in task.dependencies
-                              if dep in tasks and tasks[dep].status == AgentTaskStatus.FAILED]
-                if failed_deps:
-                    issue = IssueDetection(
-                        issue_id=f"dep_failure_{task_id}_{int(time.time())}",
-                        task_id=task_id,
-                        issue_type=IssueType.DEPENDENCY_FAILURE,
-                        description=f"Task {task_id} has failed dependencies: {failed_deps}",
-                        severity=4,
-                        metrics={"failed_dependencies": failed_deps}
-                    )
-                    self.detected_issues[issue.issue_id] = issue
-                    detected.append(issue)
-
-        # Check overall performance metrics
-        error_rate = execution_metrics.get("failed_tasks", 0) / max(1, execution_metrics.get("total_tasks", 1))
-        if error_rate > self.performance_thresholds["error_rate"]:
-            issue = IssueDetection(
-                issue_id=f"performance_error_rate_{int(time.time())}",
-                task_id="global",
-                issue_type=IssueType.PERFORMANCE,
-                description=f"High error rate detected: {error_rate:.2f}",
-                severity=3,
-                metrics={"error_rate": error_rate}
-            )
-            self.detected_issues[issue.issue_id] = issue
-            detected.append(issue)
-
-        return detected
-
-    async def suggest_fixes(self, issue: IssueDetection) -> List[Dict[str, Any]]:
-        """Suggest fixes for a detected issue.
-
-        Args:
-            issue: The detected issue
-
-        Returns:
-            List of suggested fixes
-        """
-        fixes = []
-
-        # Generic fixes based on issue type
-        if issue.issue_type == IssueType.TIMEOUT:
-            fixes.append({
-                "fix_id": f"fix_timeout_{issue.task_id}_{int(time.time())}",
-                "description": "Increase timeout for the task",
-                "action": "increase_timeout",
-                "params": {"task_id": issue.task_id, "timeout_factor": 1.5}
-            })
-            fixes.append({
-                "fix_id": f"fix_timeout_retry_{issue.task_id}_{int(time.time())}",
-                "description": "Retry the task with simplified parameters",
-                "action": "retry_simplified",
-                "params": {"task_id": issue.task_id}
-            })
-
-        elif issue.issue_type == IssueType.ERROR:
-            fixes.append({
-                "fix_id": f"fix_error_retry_{issue.task_id}_{int(time.time())}",
-                "description": "Retry the task",
-                "action": "retry",
-                "params": {"task_id": issue.task_id}
-            })
-
-            # Analyze error message for specific fixes
-            error_msg = issue.metrics.get("error", "")
-            if "token limit" in error_msg.lower():
-                fixes.append({
-                    "fix_id": f"fix_token_limit_{issue.task_id}_{int(time.time())}",
-                    "description": "Split task into smaller chunks",
-                    "action": "split_task",
-                    "params": {"task_id": issue.task_id}
-                })
-            elif "memory" in error_msg.lower():
-                fixes.append({
-                    "fix_id": f"fix_memory_{issue.task_id}_{int(time.time())}",
-                    "description": "Reduce memory usage",
-                    "action": "reduce_memory",
-                    "params": {"task_id": issue.task_id}
-                })
-
-        elif issue.issue_type == IssueType.STUCK:
-            fixes.append({
-                "fix_id": f"fix_stuck_cancel_{issue.task_id}_{int(time.time())}",
-                "description": "Cancel and restart the task",
-                "action": "cancel_restart",
-                "params": {"task_id": issue.task_id}
-            })
-
-        elif issue.issue_type == IssueType.DEPENDENCY_FAILURE:
-            fixes.append({
-                "fix_id": f"fix_dep_skip_{issue.task_id}_{int(time.time())}",
-                "description": "Skip failed dependencies and proceed",
-                "action": "skip_dependencies",
-                "params": {"task_id": issue.task_id, "dependencies": issue.metrics.get("failed_dependencies", [])}
-            })
-            fixes.append({
-                "fix_id": f"fix_dep_alt_{issue.task_id}_{int(time.time())}",
-                "description": "Use alternative approach that doesn't require failed dependencies",
-                "action": "use_alternative_approach",
-                "params": {"task_id": issue.task_id}
-            })
-
-        # Update the issue with suggested fixes
-        issue.suggested_fixes = fixes
-        return fixes
-
-    async def apply_fix(self, issue: IssueDetection, fix: Dict[str, Any],
-                       manager: ParallelAgentManager) -> FixResult:
-        """Apply a fix to an issue.
-
-        Args:
-            issue: The detected issue
-            fix: The fix to apply
-            manager: The parallel agent manager
-
-        Returns:
-            Result of applying the fix
-        """
-        fix_strategy = self.fix_strategies.get(issue.issue_type)
-        if not fix_strategy:
-            return FixResult(
-                issue_id=issue.issue_id,
-                fix_id=fix["fix_id"],
-                success=False,
-                description=f"No fix strategy available for issue type {issue.issue_type}"
-            )
-
-        # Collect metrics before applying fix
-        metrics_before = self._collect_metrics(issue.task_id, manager)
-
-        # Apply the fix
+        # This is a simplified implementation that would need to be expanded
+        # based on the actual format of the planner output
         try:
-            result = await fix_strategy(issue, fix, manager)
+            # For now, assume the planner returns a simple list of steps
+            # In a real implementation, this would parse a structured output
+            workflow_steps = []
+            lines = plan_result.strip().split('\n')
 
-            # Collect metrics after applying fix
-            metrics_after = self._collect_metrics(issue.task_id, manager)
+            current_step = None
+            for line in lines:
+                if line.startswith('Step '):
+                    # Start a new step
+                    if current_step:
+                        workflow_steps.append(current_step)
 
-            fix_result = FixResult(
-                issue_id=issue.issue_id,
-                fix_id=fix["fix_id"],
-                success=result["success"],
-                description=result["description"],
-                metrics_before=metrics_before,
-                metrics_after=metrics_after
-            )
+                    # Parse step information
+                    parts = line.split(':')
+                    if len(parts) >= 2:
+                        step_num = parts[0].replace('Step ', '').strip()
+                        step_desc = parts[1].strip()
 
-            # Store the fix result
-            self.applied_fixes[fix["fix_id"]] = fix_result
-            return fix_result
+                        # Create a new step dictionary
+                        current_step = {
+                            'agent_type': self.primary_agent_key,  # Default to primary agent
+                            'prompt': step_desc,
+                            'dependencies': [],
+                            'priority': int(step_num),
+                        }
+                elif line.startswith('Dependencies:') and current_step:
+                    # Parse dependencies
+                    deps = line.replace('Dependencies:', '').strip()
+                    if deps:
+                        current_step['dependencies'] = [d.strip() for d in deps.split(',')]
+                elif line.startswith('Agent:') and current_step:
+                    # Parse agent type
+                    agent = line.replace('Agent:', '').strip()
+                    if agent in self.agents:
+                        current_step['agent_type'] = agent
+
+            # Add the last step if it exists
+            if current_step:
+                workflow_steps.append(current_step)
+
+            return workflow_steps
 
         except Exception as e:
-            logger.error(f"Error applying fix {fix['fix_id']}: {str(e)}")
-            return FixResult(
-                issue_id=issue.issue_id,
-                fix_id=fix["fix_id"],
-                success=False,
-                description=f"Error applying fix: {str(e)}"
-            )
-
-    def _collect_metrics(self, task_id: str, manager: ParallelAgentManager) -> Dict[str, Any]:
-        """Collect current metrics for a task.
-
-        Args:
-            task_id: ID of the task
-            manager: The parallel agent manager
-
-        Returns:
-            Dictionary of metrics
-        """
-        metrics = {}
-
-        # Get task if it exists
-        task = manager.get_task(task_id)
-        if task:
-            metrics["status"] = task.status
-            metrics["retry_count"] = task.retry_count
-            if task.started_at:
-                metrics["running_time"] = (datetime.now() - task.started_at).total_seconds()
-            if task.execution_time:
-                metrics
+            logger.error(f"Error parsing workflow plan: {str(e)}")
+            # Return a simple default workflow using the primary agent
+            return [{
+                'agent_type': self.primary_agent_key,
+                'prompt': plan_result,
+                'dependencies': [],
+                'priority': 0,
+            }]

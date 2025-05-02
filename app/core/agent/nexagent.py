@@ -6,16 +6,16 @@ import json
 
 from pydantic import Field
 
-from app.agent.toolcall import ToolCallAgent
+from app.core.agent.toolcall import ToolCallAgent
 from app.prompt.nexagent import NEXT_STEP_PROMPT, SYSTEM_PROMPT
-from app.tool import ToolCollection
-from app.tool.persistent_terminate import PersistentTerminate
-from app.tool.enhanced_browser_tool import EnhancedBrowserTool
-from app.tool.file_saver import FileSaver
-from app.tool.python_execute import PythonExecute
-from app.tool.task_analytics import TaskAnalytics
-from app.tool.web_search import WebSearch
-from app.tool.base import ToolResult
+from app.tools.tool_collection import ToolCollection
+from app.tools.persistent_terminate import PersistentTerminate
+from app.tools.enhanced_browser_tool import EnhancedBrowserTool
+from app.tools.file_saver import FileSaver
+from app.tools.python_execute import PythonExecute
+from app.tools.task_analytics import TaskAnalytics
+from app.tools.web_search import WebSearch
+from app.tools.base import ToolResult
 from app.tools.enhanced_web_browser import EnhancedWebBrowser
 
 

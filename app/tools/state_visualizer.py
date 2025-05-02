@@ -10,7 +10,7 @@ import time
 from typing import Dict, List, Optional, Any, Union
 from pydantic import Field
 
-from app.tool.base import BaseTool, ToolResult
+from app.tools.base import BaseTool, ToolResult
 from app.state.agent_state_tracker import AgentStateTracker, ActionType, ActionStatus
 from app.logger import logger
 

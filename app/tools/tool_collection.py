@@ -5,31 +5,9 @@ from app.exceptions import ToolError
 from app.logger import logger
 from app.tools.base import BaseTool, ToolFailure, ToolResult
 from app.tools.dependency_resolver import DependencyResolver, DependencyError
-# Import terminal tools
-from app.tools.terminal import Terminal, Bash, EnhancedTerminal
 
-# Import browser tools
-from app.tools.browser import BrowserUseTool, EnhancedBrowserTool
-
-# Import code tools
-from app.tools.code import CodeAnalyzer, PythonExecute, StrReplaceEditor
-
-# Import other tools
-from app.tools.create_chat_completion import CreateChatCompletion
-from app.tools.terminate import Terminate
-from app.tools.data_processor import DataProcessor
-from app.tools.output_formatter import OutputFormatter
-from app.tools.error_handler import ErrorHandler
-from app.tools.error_handler_integration import ErrorHandlerIntegration
-from app.tools.file_saver import FileSaver
-from app.tools.financial_data_extractor import FinancialDataExtractor
-from app.tools.long_running_command import LongRunningCommand
-
-from app.tools.persistent_terminate import PersistentTerminate
-from app.tools.planning import Planning
-from app.tools.task_analytics import TaskAnalytics
-from app.tools.conversation_manager import ConversationManager
-from app.tools.message_notification import MessageNotifyUser, MessageAskUser
+# Import tools directly to avoid circular imports
+# We'll use dynamic imports in the constructor instead
 
 
 class ToolCollection:
@@ -48,34 +26,9 @@ class ToolCollection:
             except DependencyError as e:
                 logger.warning(f"Error building dependency graph: {e}")
 
-        # Default tools dictionary
-        self.default_tools = {
-            "bash": Bash(),
-            "browser_use": BrowserUseTool(),
-            "code_analyzer": CodeAnalyzer(),
-            "create_chat_completion": CreateChatCompletion(),
-            "data_processor": DataProcessor(),
-            "output_formatter": OutputFormatter(),
-            "enhanced_browser": EnhancedBrowserTool(),
-
-            "enhanced_terminal": EnhancedTerminal(),
-            "error_handler": ErrorHandler(),
-            "error_handler_integration": ErrorHandlerIntegration(),
-            "file_saver": FileSaver(),
-            "financial_data_extractor": FinancialDataExtractor(),
-            "long_running_command": LongRunningCommand(),
-
-            "persistent_terminate": PersistentTerminate(),
-            "planning": Planning(),
-            "python_execute": PythonExecute(),
-            "str_replace_editor": StrReplaceEditor(),
-            "task_analytics": TaskAnalytics(),
-            "terminal": Terminal(),
-            "terminate": Terminate(),
-            "conversation_manager": ConversationManager(),
-            "message_notify_user": MessageNotifyUser(),
-            "message_ask_user": MessageAskUser(),
-        }
+        # Default tools dictionary - empty by default
+        # Tools will be added dynamically when needed
+        self.default_tools = {}
 
         # Add optional tools if they exist
         try:

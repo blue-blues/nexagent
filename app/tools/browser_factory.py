@@ -9,9 +9,9 @@ import asyncio
 from typing import Dict, Optional, Any, List
 import logging
 
-from app.tool.enhanced_browser_tool import EnhancedBrowserTool
-from app.tool.fallback_browser_tool import FallbackBrowserTool
-from app.tool.web_ui_browser_tool import WebUIBrowserTool
+from app.tools.enhanced_browser_tool import EnhancedBrowserTool
+from app.tools.fallback_browser_tool import FallbackBrowserTool
+from app.tools.web_ui_browser_tool import WebUIBrowserTool
 from app.config import config
 from app.logger import logger
 

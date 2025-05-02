@@ -14,7 +14,7 @@ from pathlib import Path
 
 from pydantic import Field, create_model
 
-from app.tool.base import BaseTool, ToolResult
+from app.tools.base import BaseTool, ToolResult
 from app.logger import logger
 
 
@@ -285,7 +285,7 @@ async def execute(self, **kwargs) -> ToolResult:
         try:
             # Create a namespace for the execute method
             namespace = {}
-            exec(f"from typing import Dict, List, Optional, Any\nfrom app.tool.base import ToolResult\nimport json\n{execute_code}", namespace)
+            exec(f"from typing import Dict, List, Optional, Any\nfrom app.tools.base import ToolResult\nimport json\n{execute_code}", namespace)
             execute_method = namespace["execute"]
             
             # Create the tool class
@@ -451,7 +451,7 @@ async def execute(self, **kwargs) -> ToolResult:
             try:
                 # Create a namespace for the execute method
                 namespace = {}
-                exec(f"from typing import Dict, List, Optional, Any\nfrom app.tool.base import ToolResult\nimport json\n{custom_code}", namespace)
+                exec(f"from typing import Dict, List, Optional, Any\nfrom app.tools.base import ToolResult\nimport json\n{custom_code}", namespace)
                 
                 if "execute" not in namespace:
                     return ToolResult(error="Custom code must define an 'execute' method")

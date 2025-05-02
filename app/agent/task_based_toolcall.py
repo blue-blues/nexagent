@@ -2,66 +2,177 @@
 Task-based tool call agent implementation.
 
 This module provides a TaskBasedToolCallAgent class that executes tasks using tool calls
-rather than using a fixed number of steps.
+rather than using a fixed number of steps. The agent implements a thinking-acting loop
+pattern where it first thinks about what tools to use, then executes those tools.
+
+The agent supports different tool choice modes:
+- AUTO: The agent can choose whether to use tools or not
+- REQUIRED: The agent must use tools
+- NONE: The agent cannot use tools
+
+Copyright (c) 2023-2024 Nexagent
 """
 
 import json
-from typing import Any, List, Optional, Union
+from typing import Any, List
 
 from pydantic import Field
 
 from app.agent.task_based_agent import Task, TaskBasedAgent
 from app.exceptions import TokenLimitExceeded
 from app.logger import logger
-from app.schema import TOOL_CHOICE_TYPE, AgentState, Message, ToolCall, ToolChoice
+from app.schema import AgentState, Message, ToolCall, ToolChoice
 from app.tools import ToolCollection
-# CreateChatCompletion is not available yet, so we'll use Terminate only
 from app.tools.terminate import Terminate
 
 
+# Constants
 TOOL_CALL_REQUIRED = "Tool calls required but none provided"
+MAX_CONSECUTIVE_ERRORS = 3
+DEFAULT_MAX_ITERATIONS = 10
+DEFAULT_MAX_OBSERVE_LENGTH = 2000
 
 
 class TaskBasedToolCallAgent(TaskBasedAgent):
-    """Task-based agent class for handling tool/function calls with enhanced abstraction"""
+    """
+    Task-based agent class for handling tool/function calls with enhanced abstraction.
+
+    This agent implements a thinking-acting loop pattern where it first thinks about
+    what tools to use, then executes those tools. It supports different tool choice
+    modes and provides robust error handling for tool execution.
+
+    Attributes:
+        name: Unique name of the agent
+        description: Description of the agent
+        system_prompt: System-level instruction prompt
+        task_prompt: Prompt for executing a task
+        available_tools: Collection of tools available to the agent
+        tool_choices: Tool choice mode (AUTO, REQUIRED, NONE)
+        tool_calls: List of tool calls to execute
+        max_observe: Maximum length of tool observation to include in memory
+        max_iterations: Maximum number of think-act iterations per task
+        max_consecutive_errors: Maximum number of consecutive errors before failing
+    """
 
     name: str = "task_based_toolcall"
-    description: str = "a task-based agent that can execute tool calls."
+    description: str = "A task-based agent that can execute tool calls to complete tasks"
+    version: str = "1.0.0"
 
-    system_prompt: str = "You are an agent that can execute tool calls to complete tasks"
-    task_prompt: str = "Complete this task using the available tools. If you want to stop interaction, use `terminate` tool/function call."
+    system_prompt: str = """You are an agent that can execute tool calls to complete tasks.
+You have access to a variety of tools that can help you accomplish your tasks.
+Think carefully about which tools to use and how to use them effectively.
+Always provide clear reasoning for your actions."""
 
-    available_tools: ToolCollection = ToolCollection(
-        Terminate()
+    task_prompt: str = """Complete this task using the available tools.
+Think step by step about how to approach this task.
+If you want to stop interaction, use the `terminate` tool/function call."""
+
+    # Tool configuration
+    available_tools: ToolCollection = Field(
+        default_factory=lambda: ToolCollection(Terminate()),
+        description="Collection of tools available to the agent"
     )
 
     # Tool call settings
-    tool_choices: TOOL_CHOICE_TYPE = ToolChoice.AUTO
-    tool_calls: List[ToolCall] = Field(default_factory=list)
-    max_observe: Optional[int] = 2000  # Limit observation length
+    tool_choices: ToolChoice = Field(
+        default=ToolChoice.AUTO,
+        description="Tool choice mode (AUTO, REQUIRED, NONE)"
+    )
+    tool_calls: List[ToolCall] = Field(
+        default_factory=list,
+        description="List of tool calls to execute"
+    )
+    max_observe: int = Field(
+        default=DEFAULT_MAX_OBSERVE_LENGTH,
+        description="Maximum length of tool observation to include in memory"
+    )
+
+    # Execution control
+    max_iterations: int = Field(
+        default=DEFAULT_MAX_ITERATIONS,
+        description="Maximum number of think-act iterations per task"
+    )
+    max_consecutive_errors: int = Field(
+        default=MAX_CONSECUTIVE_ERRORS,
+        description="Maximum number of consecutive errors before failing"
+    )
+
+    # Execution statistics
+    iteration_count: int = Field(
+        default=0,
+        description="Number of think-act iterations for the current task"
+    )
+    consecutive_errors: int = Field(
+        default=0,
+        description="Number of consecutive errors encountered"
+    )
 
     async def _execute_task_impl(self, task: Task) -> str:
-        """Execute a task using tool calls."""
-        # Reset tool calls for this task
+        """
+        Execute a task using tool calls.
+
+        This method implements the core thinking-acting loop for task execution.
+        It repeatedly calls the think and act methods until the task is completed,
+        the agent is terminated, or the maximum number of iterations is reached.
+
+        Args:
+            task: The task to execute
+
+        Returns:
+            The result of the task execution
+
+        Raises:
+            RuntimeError: If too many consecutive errors occur
+        """
+        # Reset execution state for this task
         self.tool_calls = []
+        self.iteration_count = 0
+        self.consecutive_errors = 0
+
+        logger.info(f"Starting execution of task: {task.id} - {task.description}")
 
         # Execute think-act loop until task is completed or terminated
-        while True:
-            # Think about the task
-            should_act = await self.think()
-            if not should_act:
-                return "Task completed without further action"
+        while self.iteration_count < self.max_iterations:
+            self.iteration_count += 1
+            logger.debug(f"Starting iteration {self.iteration_count}/{self.max_iterations}")
 
-            # Act on the thought
-            action_result = await self.act()
+            try:
+                # Think about the task
+                should_act = await self.think()
+                if not should_act:
+                    logger.info("Agent decided no further action is needed")
+                    return "Task completed without further action"
 
-            # Check if the task is completed or terminated
-            if self.state == AgentState.FINISHED:
-                return f"Task completed: {action_result}"
+                # Reset consecutive errors counter on successful thinking
+                self.consecutive_errors = 0
 
-            # Check if we've reached a conclusion
-            if self._is_task_complete(action_result):
-                return action_result
+                # Act on the thought
+                action_result = await self.act()
+
+                # Check if the task is completed or terminated
+                if self.state == AgentState.FINISHED:
+                    logger.info(f"Task completed via termination: {action_result}")
+                    return f"Task completed: {action_result}"
+
+                # Check if we've reached a conclusion
+                if self._is_task_complete(action_result):
+                    logger.info(f"Task completed with result: {action_result}")
+                    return action_result
+
+            except Exception as e:
+                self.consecutive_errors += 1
+                error_msg = f"Error in iteration {self.iteration_count}: {str(e)}"
+                logger.error(error_msg)
+
+                # If too many consecutive errors, fail the task
+                if self.consecutive_errors >= self.max_consecutive_errors:
+                    raise RuntimeError(
+                        f"Task failed after {self.consecutive_errors} consecutive errors: {str(e)}"
+                    )
+
+        # If we reach here, we've hit the maximum number of iterations
+        logger.warning(f"Task reached maximum iterations ({self.max_iterations}) without completion")
+        return f"Task incomplete after {self.max_iterations} iterations. Last result: {action_result if 'action_result' in locals() else 'No result'}"
 
     async def think(self) -> bool:
         """Process current task and decide next actions using tools."""
@@ -214,13 +325,43 @@ class TaskBasedToolCallAgent(TaskBasedAgent):
             return f"Error: {error_msg}"
 
     async def _handle_special_tool(self, name: str, result: Any) -> None:
-        """Handle special tools like terminate."""
+        """
+        Handle special tools like terminate.
+
+        Args:
+            name: The name of the tool
+            result: The result of the tool execution
+        """
         if name == "terminate":
             logger.info("🛑 Agent received terminate command")
             self.state = AgentState.FINISHED
 
-    def _is_task_complete(self, result: str) -> bool:
-        """Check if the task is complete based on the result."""
-        # This is a simple implementation that can be overridden by subclasses
+        # Add handling for other special tools here as needed
+
+    def _is_task_complete(self, action_result: str) -> bool:
+        """
+        Check if the task is complete based on the action result.
+
+        This is a simple implementation that can be overridden by subclasses
+        to implement more sophisticated completion detection.
+
+        Args:
+            action_result: The result of the most recent action
+
+        Returns:
+            True if the task is complete, False otherwise
+        """
         # For now, we'll consider the task complete if the agent has been terminated
-        return self.state == AgentState.FINISHED
+        # or if the action result contains a specific completion marker
+        if self.state == AgentState.FINISHED:
+            return True
+
+        # Check for completion markers in the action result
+        completion_markers = [
+            "Task completed successfully",
+            "All requirements have been met",
+            "Final result:",
+            "Completed all requested actions"
+        ]
+
+        return any(marker in action_result for marker in completion_markers)

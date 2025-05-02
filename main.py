@@ -11,11 +11,15 @@ import os
 import shutil
 import sys
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional
 
 # Import from the new architecture
 from app.ui.cli.cli import main as cli_main
-from app.utils.logging.logger import logger
+try:
+    from app.utils.logging.logger import logger
+except ImportError:
+    # Fallback to app.logger if utils.logging.logger is not available
+    from app.logger import logger
 
 # Legacy imports - will be migrated to the new architecture
 from app.flow.integrated_flow import IntegratedFlow
@@ -23,7 +27,25 @@ from app.session import session_manager
 from app.timeline.timeline import Timeline
 from app.timeline.events import create_user_input_event, create_error_event
 from app.integration.adaptive_nexagent import AdaptiveNexagentIntegration
-from app.agent.manus_agent import ManusAgent
+# Import ManusAgent with fallback to Nexagent
+try:
+    from app.core.agent.manus import Nexagent as ManusAgent
+except ImportError:
+    try:
+        from app.agent.task_based_nexagent import TaskBasedNexagent as ManusAgent
+    except ImportError:
+        # Define a minimal ManusAgent if both imports fail
+        from app.agent.base import BaseAgent
+        class ManusAgent(BaseAgent):
+            """Fallback ManusAgent implementation."""
+            name = "fallback_manus_agent"
+            description = "Fallback implementation of ManusAgent"
+            timeline = None
+            available_tools = None
+
+            async def run(self, _prompt: str) -> str:
+                logger.error("Using fallback ManusAgent implementation")
+                return "Error: ManusAgent implementation not available"
 
 
 async def process_request(prompt: str, adaptive_nexagent: AdaptiveNexagentIntegration, session_id: Optional[str] = None, processing_mode: str = "auto", file_attachment: Optional[str] = None) -> dict:

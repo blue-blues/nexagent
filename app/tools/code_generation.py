@@ -14,7 +14,7 @@ from pathlib import Path
 
 from pydantic import Field
 
-from app.tool.base import BaseTool, ToolResult
+from app.tools.base import BaseTool, ToolResult
 from app.logger import logger
 from app.sandbox.code_sandbox import CodeSandbox, default_code_sandbox
 

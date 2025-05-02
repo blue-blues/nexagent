@@ -10,7 +10,7 @@ from pydantic import Field, field_validator
 from pydantic_core.core_schema import ValidationInfo
 
 from app.config import config
-from app.tool.base import BaseTool, ToolResult
+from app.tools.base import BaseTool, ToolResult
 
 
 MAX_LENGTH = 20000

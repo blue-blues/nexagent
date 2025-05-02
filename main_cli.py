@@ -1,12 +1,11 @@
-import asyncio
-import os
 import sys
-from app.cli import main as cli_main
+from app.ui.cli.cli import main as cli_main
 
 if __name__ == "__main__":
     try:
         # Run the CLI main function
-        asyncio.run(cli_main())
+        exit_code = cli_main()
+        sys.exit(exit_code)
     except KeyboardInterrupt:
         print("\nExiting NexAgent CLI...")
         sys.exit(0)

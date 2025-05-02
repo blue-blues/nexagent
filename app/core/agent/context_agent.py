@@ -16,9 +16,9 @@ from app.agent.base import BaseAgent
 from app.agent.toolcall import ToolCallAgent
 from app.schema import Message, AgentState, ToolChoice
 from app.tool import ToolCollection
-from app.tool.terminate import Terminate
-from app.tool.input_parser import InputParser
-from app.tool.keyword_extractor import KeywordExtractor
+from app.tools.terminate import Terminate
+from app.tools.input_parser import InputParser
+from app.tools.keyword_extractor import KeywordExtractor
 from app.logger import logger
 
 

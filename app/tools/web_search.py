@@ -3,8 +3,8 @@ from typing import List
 
 from app.config import config
 from tenacity import retry, stop_after_attempt, wait_exponential
-from app.tool.base import BaseTool
-from app.tool.search import (
+from app.tools.base import BaseTool
+from app.tools.search import (
     BaiduSearchEngine,
     DuckDuckGoSearchEngine,
     GoogleSearchEngine,
@@ -13,8 +13,8 @@ from app.tool.search import (
 
 class WebSearch(BaseTool):
     name: str = "web_search"
-    description: str = """Perform a web search and return a list of relevant links. 
-    This function attempts to use the primary search engine API to get up-to-date results. 
+    description: str = """Perform a web search and return a list of relevant links.
+    This function attempts to use the primary search engine API to get up-to-date results.
     If an error occurs, it falls back to an alternative search engine."""
     parameters: dict = {
         "type": "object",
@@ -49,10 +49,10 @@ class WebSearch(BaseTool):
             List[str]: A list of URLs matching the search query.
         """
         from loguru import logger
-        
+
         engine_order = self._get_engine_order()
         all_errors = {}
-        
+
         for engine_name in engine_order:
             engine = self._search_engine[engine_name]
             try:
@@ -67,11 +67,11 @@ class WebSearch(BaseTool):
                 error_msg = f"Search engine '{engine_name}' failed with error: {e}"
                 logger.error(error_msg)
                 all_errors[engine_name] = str(e)
-        
+
         # If we get here, all engines failed
         logger.error(f"All search engines failed. Errors: {all_errors}")
         return []
-    
+
     def _get_engine_order(self) -> List[str]:
         """
         Determines the order in which to try search engines.
@@ -91,22 +91,22 @@ class WebSearch(BaseTool):
             if key not in engine_order:
                 engine_order.append(key)
         return engine_order
-    
+
     async def _perform_search_with_engine(
-        self, 
-        engine: WebSearchEngine, 
-        query: str, 
+        self,
+        engine: WebSearchEngine,
+        query: str,
         num_results: int,
     ) -> List[str]:
         from loguru import logger
-        
+
         try:
             loop = asyncio.get_event_loop()
             # Remove the retry decorator and handle retries manually
             max_attempts = 3
             attempt = 0
             last_error = None
-            
+
             while attempt < max_attempts:
                 try:
                     attempt += 1
@@ -120,7 +120,7 @@ class WebSearch(BaseTool):
                     wait_time = min(2 ** attempt, 10)  # Exponential backoff with max of 10 seconds
                     logger.warning(f"Search attempt {attempt} failed: {e}. Retrying in {wait_time}s...")
                     await asyncio.sleep(wait_time)
-            
+
             # If we get here, all attempts failed
             raise last_error or Exception("All search attempts failed")
         except Exception as e:

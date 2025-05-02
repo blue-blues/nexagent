@@ -6,8 +6,8 @@ from typing import Optional, List, Dict, Any
 from pydantic import Field
 
 from app.config import config
-from app.tool.base import BaseTool, ToolResult
-from app.tool.enhanced_browser_tool import EnhancedBrowserTool
+from app.tools.base import BaseTool, ToolResult
+from app.tools.enhanced_browser_tool import EnhancedBrowserTool
 
 
 class WebUIBrowserTool(BaseTool):

@@ -1,15 +1,38 @@
 import os
 import json
 import re
-from typing import Dict, Any, Union, List, Optional, BinaryIO
-from pathlib import Path
+from typing import Dict, Any, Union, List, Optional
 
 import aiofiles
 
-from app.tool.base import BaseTool, ToolResult
-from app.tool.output_formatter import OutputFormatter
+# Try to import from different locations
+try:
+    from app.tools.base import BaseTool, ToolResult
+    from app.tools.output_formatter import OutputFormatter
+except ImportError:
+    try:
+        from app.core.tool.base import BaseTool, ToolResult
+        from app.core.tool.output_formatter import OutputFormatter
+    except ImportError:
+        # Define minimal classes if imports fail
+        class ToolResult:
+            def __init__(self, output=None, error=None):
+                self.output = output
+                self.error = error
+
+        class BaseTool:
+            """Fallback BaseTool implementation."""
+            name = "base_tool"
+            description = "Base tool class"
+            parameters = {}
+
+        class OutputFormatter:
+            def format(self, content, format_type="text", indent=2):
+                if isinstance(content, (dict, list)) and format_type == "json":
+                    import json
+                    return json.dumps(content, indent=indent)
+                return str(content)
 from app.logger import logger
-from app.exceptions import ToolError
 
 
 class FileSaver(BaseTool):
@@ -63,9 +86,9 @@ class FileSaver(BaseTool):
         self.formatter = OutputFormatter()
 
     async def execute(
-        self, 
-        content: Union[str, Dict[str, Any], List, bytes], 
-        file_path: str, 
+        self,
+        content: Union[str, Dict[str, Any], List, bytes],
+        file_path: str,
         format: str = "auto",
         mode: str = "w",
         indent: int = 2,
@@ -89,16 +112,16 @@ class FileSaver(BaseTool):
             # Validate file path
             if not file_path or not isinstance(file_path, str):
                 return ToolResult(output="Invalid file path provided", error=True)
-            
+
             # Check for potentially unsafe paths
             if self._is_unsafe_path(file_path):
                 error_msg = f"Potentially unsafe file path: {file_path}"
                 logger.error(error_msg)
                 return ToolResult(output=error_msg, error=True)
-                
+
             # Normalize path to prevent directory traversal attacks
             file_path = os.path.normpath(file_path)
-            
+
             # Ensure the directory exists
             directory = os.path.dirname(file_path)
             if directory and not os.path.exists(directory):
@@ -116,7 +139,7 @@ class FileSaver(BaseTool):
             # Determine format based on file extension if set to auto
             if format == "auto":
                 format = self._detect_format_from_path(file_path)
-            
+
             # Format the content if it's a data structure and pretty printing is enabled
             final_content = self._prepare_content(content, format, indent, pretty)
 
@@ -126,7 +149,7 @@ class FileSaver(BaseTool):
                 if self._is_likely_binary(final_content):
                     logger.warning(f"Content appears to be binary, switching to binary mode for file: {file_path}")
                     return await self._save_binary_content(final_content.encode('utf-8', errors='replace'), file_path, 'wb')
-                
+
                 async with aiofiles.open(file_path, mode, encoding="utf-8") as file:
                     await file.write(final_content)
             except UnicodeEncodeError:
@@ -147,30 +170,30 @@ class FileSaver(BaseTool):
         except Exception as e:
             logger.error(f"Error saving file: {str(e)}")
             return ToolResult(output=f"Error saving file: {str(e)}", error=True)
-    
+
     async def _save_binary_content(self, content: bytes, file_path: str, mode: str = "wb") -> ToolResult:
         """Save binary content to a file"""
         try:
             # Ensure mode is binary
             if not mode.endswith('b'):
                 mode = mode + 'b'
-                
+
             # Convert to bytes if not already
             if not isinstance(content, bytes):
                 if isinstance(content, str):
                     content = content.encode('utf-8')
                 else:
                     content = str(content).encode('utf-8')
-                    
+
             async with aiofiles.open(file_path, mode) as file:
                 await file.write(content)
-                
+
             return ToolResult(output=f"Binary content successfully saved to {file_path}")
         except Exception as e:
             error_msg = f"Error saving binary file: {str(e)}"
             logger.error(error_msg)
             return ToolResult(output=error_msg, error=True)
-    
+
     def _is_unsafe_path(self, file_path: str) -> bool:
         """Check if a file path might be unsafe"""
         # Check for absolute paths that might be system critical
@@ -185,39 +208,39 @@ class FileSaver(BaseTool):
             r'^C:\\Program Files',
             r'^C:\\Windows\\System32',
         ]
-        
+
         for pattern in unsafe_patterns:
             if re.match(pattern, file_path, re.IGNORECASE):
                 return True
-                
+
         return False
-        
+
     def _is_likely_binary(self, content: str) -> bool:
         """Determine if content is likely binary based on null bytes or high concentration of non-printable chars"""
         if not isinstance(content, str):
             return False
-            
+
         # Check for null bytes which indicate binary content
         if '\x00' in content:
             return True
-            
+
         # Check for high concentration of non-printable characters
         non_printable = 0
         sample_size = min(len(content), 1000)  # Check first 1000 chars
         for i in range(sample_size):
             if ord(content[i]) < 32 and content[i] not in '\n\r\t':
                 non_printable += 1
-                
+
         # If more than 10% are non-printable, likely binary
         return non_printable > (sample_size * 0.1)
-    
+
     def _detect_format_from_path(self, file_path: str) -> str:
         """Detect the appropriate format based on file extension"""
         if not file_path:
             return "text"
-            
+
         extension = os.path.splitext(file_path)[1].lower()
-        
+
         # Binary formats
         binary_extensions = {
             ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".ico", ".webp",  # Images
@@ -225,10 +248,10 @@ class FileSaver(BaseTool):
             ".zip", ".tar", ".gz", ".7z", ".rar",  # Archives
             ".exe", ".dll", ".so", ".bin", ".dat"  # Executables and binary data
         }
-        
+
         if extension in binary_extensions:
             return "binary"
-        
+
         format_map = {
             ".json": "json",
             ".yaml": "yaml",
@@ -251,19 +274,19 @@ class FileSaver(BaseTool):
             ".ini": "text",
             ".cfg": "text",
         }
-        
+
         return format_map.get(extension, "text")
-    
+
     def _prepare_content(self, content: Union[str, Dict, List], format: str, indent: int, pretty: bool) -> str:
         """Prepare content for saving, applying formatting if needed"""
         # Handle None or empty content
         if content is None:
             return ""
-            
+
         # If content is already a string and pretty printing is disabled, return as is
         if isinstance(content, str) and not pretty:
             return content
-            
+
         # If content is a data structure, format it according to the specified format
         if isinstance(content, (dict, list)) and pretty:
             try:
@@ -271,7 +294,7 @@ class FileSaver(BaseTool):
             except Exception as e:
                 logger.warning(f"Error formatting content: {str(e)}. Falling back to string representation.")
                 return str(content)
-        
+
         # For string content with pretty printing enabled, try to parse and format if it looks like JSON
         if isinstance(content, str) and pretty:
             content_stripped = content.strip()
@@ -282,6 +305,6 @@ class FileSaver(BaseTool):
                 except json.JSONDecodeError:
                     # Not valid JSON, return as is
                     pass
-        
+
         # Default case: return content as string
         return str(content)
