@@ -63,6 +63,14 @@ Nexagent is a powerful, intelligent agent framework that offers multiple special
 - **Version history**: Track the history of changes to a plan
 - **Version tagging**: Tag important versions for easy reference
 
+### Adaptive Learning System
+
+- **Interaction memory**: Stores and indexes past interactions for future reference
+- **Performance analytics**: Analyzes performance across different tasks to identify strengths and weaknesses
+- **Strategy adaptation**: Dynamically adjusts approach based on past performance data
+- **Knowledge distillation**: Extracts generalizable knowledge from specific experiences
+- **Feedback integration**: Incorporates explicit and implicit user feedback to guide learning
+
 ### Terminal UI Component
 
 - **Syntax highlighting**: Automatically highlights code based on language detection
@@ -110,11 +118,17 @@ Nexagent now operates exclusively through a command-line interface for improved 
 
 Nexagent has been redesigned with a new modular architecture that follows a layered approach:
 
-1. **Core Layer**: Provides foundational functionality like LLM interfaces, context management, and schema definitions.
-2. **Agent Layer**: Implements the agent loop and various agent types.
-3. **Tools Layer**: Provides tools that agents can use to interact with the world.
-4. **UI Layer**: Provides user interfaces for interacting with the system.
-5. **Integration Layer**: Provides integration points with external systems.
+1. **Core Layer**: Provides foundational functionality like LLM interfaces, context management, schema definitions, and versioned memory.
+2. **Agent Layer**: Implements the agent loop and various agent types including TaskBasedNexagent, ManusAgent, and SWEAgent.
+3. **Tools Layer**: Provides tools that agents can use to interact with the world, organized by functionality (browser, code, terminal, etc.).
+4. **UI Layer**: Provides user interfaces for interacting with the system through CLI.
+5. **Integration Layer**: Provides integration points with external systems and the Adaptive Learning System.
+
+The new architecture offers several advantages:
+- **Improved modularity**: Each component has a clear responsibility and can be replaced independently
+- **Better extensibility**: New agent types and tools can be added without modifying existing code
+- **Enhanced maintainability**: Clear separation of concerns makes the codebase easier to understand and maintain
+- **Adaptive learning**: The system can learn from past interactions and improve over time
 
 To use the new architecture, run the application with the `--new` flag:
 
@@ -205,7 +219,25 @@ temperature = 0.0
 [browser]
 headless = false  # Set to true for production use
 timeout = 30000   # Default timeout in milliseconds
+
+# Adaptive Learning System configuration
+[adaptive_learning]
+enabled = true
+storage_path = "data/adaptive_learning"
+backup_enabled = true
+backup_frequency_hours = 24
+max_backups = 7
+
+# Feedback configuration
+[adaptive_learning.feedback]
+explicit_feedback_weight = 2.0
+implicit_feedback_weight = 1.0
+feedback_history_size = 100
 ```
+
+### Advanced Configuration
+
+For more advanced configuration options, see the [installation guide](docs/installation.md).
 
 
 ## Examples

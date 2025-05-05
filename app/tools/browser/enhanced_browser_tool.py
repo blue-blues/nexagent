@@ -1,7 +1,7 @@
 import asyncio
 import json
 import random
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Any
 
 from browser_use import Browser as BrowserUseBrowser
 from browser_use import BrowserConfig
@@ -15,6 +15,13 @@ from app.tools.browser.browser_use_tool import BrowserUseTool
 from app.tools.data_processor import DataProcessor
 from app.logger import logger
 from app.tools.browser.structured_data_extractor import StructuredDataExtractor
+
+# Import adaptive learning components if available
+try:
+    from app.adaptive_learning.core.adaptive_system import AdaptiveLearningSystem
+    ADAPTIVE_LEARNING_AVAILABLE = True
+except ImportError:
+    ADAPTIVE_LEARNING_AVAILABLE = False
 
 
 class EnhancedBrowserTool(BrowserUseTool):
@@ -34,6 +41,7 @@ class EnhancedBrowserTool(BrowserUseTool):
     - 'extract_structured': Extract structured data from the page
     - 'navigate_and_extract': Navigate to URL and extract content in one step
     - 'agentic_browse': Intelligently browse a website to find specific information
+    - 'ai_navigate': Advanced AI-driven navigation that understands page semantics and interacts naturally
     - 'multi_page_extract': Extract data from multiple pages in a website
     - 'follow_pagination': Follow pagination links to extract data from all pages
     """
@@ -64,6 +72,7 @@ class EnhancedBrowserTool(BrowserUseTool):
                     "extract_structured_data",
                     "navigate_and_extract",
                     "agentic_browse",
+                    "ai_navigate",
                     "multi_page_extract",
                     "follow_pagination",
                 ],
@@ -124,7 +133,7 @@ class EnhancedBrowserTool(BrowserUseTool):
             },
             "query": {
                 "type": "string",
-                "description": "Search query or information to find for 'agentic_browse' action",
+                "description": "Search query or information to find for 'agentic_browse' and 'ai_navigate' actions",
             },
             "max_pages": {
                 "type": "integer",
@@ -132,9 +141,16 @@ class EnhancedBrowserTool(BrowserUseTool):
             },
             "page_limit": {
                 "type": "integer",
-                "description": "Maximum number of pages to visit for 'agentic_browse' action",
+                "description": "Maximum number of pages to visit for 'agentic_browse' and 'ai_navigate' actions",
             },
-
+            "interaction_depth": {
+                "type": "integer",
+                "description": "Maximum depth of interactions (clicks, form fills) for 'ai_navigate' action",
+            },
+            "navigation_goal": {
+                "type": "string",
+                "description": "Goal of navigation for 'ai_navigate' action (e.g., 'find_information', 'complete_form', 'download_file')",
+            },
             "pagination_selector": {
                 "type": "string",
                 "description": "CSS selector for pagination links for 'follow_pagination' action",
@@ -153,6 +169,12 @@ class EnhancedBrowserTool(BrowserUseTool):
     current_user_agent: str = Field(default="")
     default_timeout: int = Field(default=30000)  # 30 seconds default timeout
 
+    # Adaptive learning integration
+    adaptive_learning_enabled: bool = Field(default=False)
+    adaptive_learning_system: Optional[Any] = Field(default=None)
+    data_collection_enabled: bool = Field(default=True)
+    collected_data: List[str] = Field(default_factory=list)
+
     # Common user agents for rotation
     user_agents: List[str] = Field(default_factory=lambda: [
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
@@ -162,6 +184,38 @@ class EnhancedBrowserTool(BrowserUseTool):
         "Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1",
         "Mozilla/5.0 (iPad; CPU OS 14_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1",
     ])
+
+    async def _record_adaptive_learning_data(self, action: str, params: Dict[str, Any], result: ToolResult) -> None:
+        """Record data for adaptive learning if enabled."""
+        if not self.adaptive_learning_enabled or not self.adaptive_learning_system or not self.data_collection_enabled:
+            return
+
+        try:
+            # Record the interaction
+            interaction_data = {
+                "tool": "enhanced_browser",
+                "action": action,
+                "params": params,
+                "success": not bool(result.error),
+                "timestamp": None,  # Will be filled by the adaptive learning system
+                "execution_time": None,  # Will be filled by the adaptive learning system
+                "result_summary": result.output[:200] if result.output else result.error[:200] if result.error else ""
+            }
+
+            # Add to collected data
+            self.collected_data.append(interaction_data)
+
+            # Record in adaptive learning system
+            await self.adaptive_learning_system.record_interaction(
+                tool_name="enhanced_browser",
+                action=action,
+                params=params,
+                result={"success": not bool(result.error), "output": result.output, "error": result.error},
+                metadata={"url": params.get("url", "")}
+            )
+
+        except Exception as e:
+            logger.error(f"Error recording adaptive learning data: {str(e)}")
 
     async def execute(
         self,
@@ -185,6 +239,8 @@ class EnhancedBrowserTool(BrowserUseTool):
         page_limit: Optional[int] = None,
         pagination_selector: Optional[str] = None,
         next_page_text: Optional[str] = None,
+        interaction_depth: Optional[int] = None,
+        navigation_goal: Optional[str] = None,
         **kwargs,
     ) -> ToolResult:
         """
@@ -704,6 +760,193 @@ class EnhancedBrowserTool(BrowserUseTool):
                     except Exception as e:
                         return ToolResult(error=f"Error during agentic browsing: {str(e)}")
 
+                # Handle AI-driven navigation
+                elif action == "ai_navigate":
+                    if not url:
+                        return ToolResult(error="URL is required for 'ai_navigate' action")
+                    if not query:
+                        return ToolResult(error="Query is required for 'ai_navigate' action")
+
+                    try:
+                        # Set default values for parameters
+                        page_limit_val = page_limit or 10
+                        interaction_depth_val = interaction_depth or 3
+                        nav_goal = navigation_goal or "find_information"
+
+                        # Navigate to the initial URL
+                        await asyncio.wait_for(
+                            context.navigate_to(url),
+                            timeout=actual_timeout / 1000  # Convert to seconds
+                        )
+
+                        # Wait for page to load completely
+                        await asyncio.sleep(3)
+
+                        # Initialize tracking variables
+                        visited_urls = {url}
+                        pages_visited = 1
+                        interactions_performed = 0
+                        navigation_path = [{"url": url, "action": "initial_visit"}]
+
+                        # Get initial page analysis
+                        page_analysis = await self._analyze_page_semantics(context, query)
+
+                        # Check if the information is already on the current page
+                        if page_analysis["relevance_score"] > 0.7:
+                            # Information likely found on the first page
+                            result = {
+                                "found": True,
+                                "confidence": page_analysis["relevance_score"],
+                                "pages_visited": 1,
+                                "current_url": url,
+                                "content": page_analysis["main_content"],
+                                "query": query,
+                                "navigation_path": navigation_path
+                            }
+                            return ToolResult(output=json.dumps(result, ensure_ascii=False))
+
+                        # Begin intelligent navigation
+                        current_url = url
+                        current_depth = 0
+
+                        while current_depth < interaction_depth_val and pages_visited < page_limit_val:
+                            # Get actionable elements on the page
+                            actionable_elements = await self._identify_actionable_elements(context, query)
+
+                            if not actionable_elements:
+                                # No actionable elements found, try to find links to follow
+                                next_links = await self._find_relevant_links(context, query)
+
+                                if not next_links:
+                                    # No relevant links found, we're at a dead end
+                                    break
+
+                                # Navigate to the most relevant link
+                                next_url = next_links[0]["url"]
+                                if next_url in visited_urls:
+                                    # Skip already visited URLs
+                                    if len(next_links) > 1:
+                                        next_url = next_links[1]["url"]
+                                        if next_url in visited_urls:
+                                            break  # No more unvisited relevant links
+                                    else:
+                                        break  # No more unvisited relevant links
+
+                                # Navigate to the next URL
+                                try:
+                                    await asyncio.wait_for(
+                                        context.navigate_to(next_url),
+                                        timeout=actual_timeout / 1000
+                                    )
+
+                                    # Wait for page to load
+                                    await asyncio.sleep(2)
+
+                                    # Update tracking
+                                    visited_urls.add(next_url)
+                                    pages_visited += 1
+                                    current_url = next_url
+                                    navigation_path.append({
+                                        "url": next_url,
+                                        "action": "follow_link",
+                                        "reason": f"Relevance score: {next_links[0]['relevance']}"
+                                    })
+
+                                    # Analyze the new page
+                                    page_analysis = await self._analyze_page_semantics(context, query)
+
+                                    # Check if we found what we're looking for
+                                    if page_analysis["relevance_score"] > 0.7:
+                                        result = {
+                                            "found": True,
+                                            "confidence": page_analysis["relevance_score"],
+                                            "pages_visited": pages_visited,
+                                            "interactions_performed": interactions_performed,
+                                            "current_url": current_url,
+                                            "content": page_analysis["main_content"],
+                                            "query": query,
+                                            "navigation_path": navigation_path
+                                        }
+                                        return ToolResult(output=json.dumps(result, ensure_ascii=False))
+
+                                except Exception as e:
+                                    logger.error(f"Error navigating to {next_url}: {str(e)}")
+                                    continue
+
+                            else:
+                                # We have actionable elements, interact with the most relevant one
+                                best_element = actionable_elements[0]
+
+                                try:
+                                    # Perform the interaction
+                                    interaction_result = await self._interact_with_element(
+                                        context,
+                                        best_element["selector"],
+                                        best_element["action_type"],
+                                        best_element.get("input_value")
+                                    )
+
+                                    # Update tracking
+                                    interactions_performed += 1
+                                    current_depth += 1
+                                    navigation_path.append({
+                                        "url": current_url,
+                                        "action": best_element["action_type"],
+                                        "element": best_element["description"],
+                                        "result": interaction_result
+                                    })
+
+                                    # Check if URL changed after interaction
+                                    new_url = await context.execute_javascript("return window.location.href")
+                                    if new_url != current_url:
+                                        visited_urls.add(new_url)
+                                        pages_visited += 1
+                                        current_url = new_url
+
+                                    # Wait for any dynamic content to load
+                                    await asyncio.sleep(2)
+
+                                    # Analyze the page after interaction
+                                    page_analysis = await self._analyze_page_semantics(context, query)
+
+                                    # Check if we found what we're looking for
+                                    if page_analysis["relevance_score"] > 0.7:
+                                        result = {
+                                            "found": True,
+                                            "confidence": page_analysis["relevance_score"],
+                                            "pages_visited": pages_visited,
+                                            "interactions_performed": interactions_performed,
+                                            "current_url": current_url,
+                                            "content": page_analysis["main_content"],
+                                            "query": query,
+                                            "navigation_path": navigation_path
+                                        }
+                                        return ToolResult(output=json.dumps(result, ensure_ascii=False))
+
+                                except Exception as e:
+                                    logger.error(f"Error interacting with element: {str(e)}")
+                                    current_depth += 1  # Count failed interactions toward depth limit
+
+                        # If we get here, we didn't find the information with high confidence
+                        # Return the best result we have
+                        result = {
+                            "found": page_analysis["relevance_score"] > 0.4,  # Lower threshold for partial matches
+                            "confidence": page_analysis["relevance_score"],
+                            "pages_visited": pages_visited,
+                            "interactions_performed": interactions_performed,
+                            "current_url": current_url,
+                            "content": page_analysis["main_content"],
+                            "query": query,
+                            "navigation_path": navigation_path,
+                            "visited_urls": list(visited_urls)
+                        }
+                        return ToolResult(output=json.dumps(result, ensure_ascii=False))
+
+                    except asyncio.TimeoutError:
+                        return ToolResult(error=f"AI navigation timed out after {actual_timeout/1000} seconds")
+                    except Exception as e:
+                        return ToolResult(error=f"Error during AI navigation: {str(e)}")
+
                 # Handle multi-page extraction
                 elif action == "multi_page_extract":
                     if not url:
@@ -852,7 +1095,7 @@ class EnhancedBrowserTool(BrowserUseTool):
 
                 # For other standard actions, call the parent class implementation with a timeout wrapper
                 try:
-                    return await asyncio.wait_for(
+                    result = await asyncio.wait_for(
                         super().execute(
                             action=action,
                             url=url,
@@ -865,17 +1108,82 @@ class EnhancedBrowserTool(BrowserUseTool):
                         ),
                         timeout=actual_timeout / 1000  # Convert to seconds
                     )
+
+                    # Record data for adaptive learning
+                    if self.adaptive_learning_enabled:
+                        params = {
+                            "url": url,
+                            "index": index,
+                            "text": text,
+                            "script": script,
+                            "scroll_amount": scroll_amount,
+                            "tab_id": tab_id,
+                            "timeout": actual_timeout
+                        }
+                        # Remove None values
+                        params = {k: v for k, v in params.items() if v is not None}
+                        await self._record_adaptive_learning_data(action, params, result)
+
+                    return result
+
                 except asyncio.TimeoutError:
-                    return ToolResult(error=f"Action '{action}' timed out after {actual_timeout/1000} seconds")
+                    error_result = ToolResult(error=f"Action '{action}' timed out after {actual_timeout/1000} seconds")
+
+                    # Record timeout for adaptive learning
+                    if self.adaptive_learning_enabled:
+                        params = {
+                            "url": url,
+                            "action": action,
+                            "error": "timeout",
+                            "timeout": actual_timeout
+                        }
+                        await self._record_adaptive_learning_data(action, params, error_result)
+
+                    return error_result
+
                 except Exception as e:
-                    return ToolResult(error=f"Error executing action '{action}': {str(e)}")
+                    error_result = ToolResult(error=f"Error executing action '{action}': {str(e)}")
+
+                    # Record error for adaptive learning
+                    if self.adaptive_learning_enabled:
+                        params = {
+                            "url": url,
+                            "action": action,
+                            "error": str(e)
+                        }
+                        await self._record_adaptive_learning_data(action, params, error_result)
+
+                    return error_result
 
             except Exception as e:
-                return ToolResult(error=f"Error executing browser action: {str(e)}")
+                error_result = ToolResult(error=f"Error executing browser action: {str(e)}")
+
+                # Record error for adaptive learning
+                if self.adaptive_learning_enabled:
+                    params = {
+                        "url": url,
+                        "action": action,
+                        "error": str(e)
+                    }
+                    await self._record_adaptive_learning_data(action, params, error_result)
+
+                return error_result
 
     async def _ensure_browser_initialized(self) -> BrowserContext:
         """Ensure browser and context are initialized with enhanced settings."""
         if self.browser is None:
+            # Initialize adaptive learning if available
+            if ADAPTIVE_LEARNING_AVAILABLE and not self.adaptive_learning_system:
+                try:
+                    # Check if adaptive learning is enabled in config
+                    if hasattr(config, 'adaptive_learning') and getattr(config.adaptive_learning, 'enabled', False):
+                        self.adaptive_learning_enabled = True
+                        self.adaptive_learning_system = AdaptiveLearningSystem()
+                        logger.info("Adaptive Learning System initialized for EnhancedBrowserTool")
+                except Exception as e:
+                    logger.error(f"Failed to initialize Adaptive Learning System: {str(e)}")
+                    self.adaptive_learning_enabled = False
+
             browser_config_kwargs = {
                 "headless": False,
                 "disable_security": True,
@@ -1791,6 +2099,649 @@ class EnhancedBrowserTool(BrowserUseTool):
         except Exception as e:
             print(f"Error during infinite scroll detection: {str(e)}")
             return False
+
+    async def _analyze_page_semantics(self, context: BrowserContext, query: str) -> Dict:
+        """
+        Analyze the page semantics and content to understand its structure and relevance to the query.
+        Returns a dictionary with semantic analysis of the page.
+        """
+        try:
+            # Get page metadata
+            metadata = await self._extract_page_metadata(context)
+
+            # Extract main content
+            main_content = await self._extract_page_text(context)
+
+            # Extract page structure
+            page_structure = await context.execute_javascript("""
+                function analyzePageStructure() {
+                    const structure = {
+                        title: document.title,
+                        headings: [],
+                        mainContentAreas: [],
+                        navigationAreas: [],
+                        forms: [],
+                        interactiveElements: []
+                    };
+
+                    // Extract headings
+                    document.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach(heading => {
+                        if (heading.innerText.trim()) {
+                            structure.headings.push({
+                                level: parseInt(heading.tagName.substring(1)),
+                                text: heading.innerText.trim(),
+                                isVisible: heading.getBoundingClientRect().height > 0
+                            });
+                        }
+                    });
+
+                    // Identify main content areas
+                    const mainSelectors = ['main', 'article', '#content', '.content', '.main', '.post', '.article', '[role="main"]'];
+                    mainSelectors.forEach(selector => {
+                        const elements = document.querySelectorAll(selector);
+                        elements.forEach(el => {
+                            if (el.innerText.trim().length > 200) {
+                                structure.mainContentAreas.push({
+                                    selector: selector,
+                                    textLength: el.innerText.trim().length,
+                                    hasHeadings: el.querySelectorAll('h1, h2, h3, h4, h5, h6').length > 0
+                                });
+                            }
+                        });
+                    });
+
+                    // Identify navigation areas
+                    const navSelectors = ['nav', 'header nav', 'footer nav', '.navigation', '.menu', '[role="navigation"]'];
+                    navSelectors.forEach(selector => {
+                        const elements = document.querySelectorAll(selector);
+                        elements.forEach(el => {
+                            const links = el.querySelectorAll('a');
+                            if (links.length > 0) {
+                                structure.navigationAreas.push({
+                                    selector: selector,
+                                    linkCount: links.length,
+                                    isMainNav: el.closest('header') !== null || el.id === 'main-nav' || el.classList.contains('main-nav')
+                                });
+                            }
+                        });
+                    });
+
+                    // Identify forms
+                    document.querySelectorAll('form').forEach(form => {
+                        const inputs = form.querySelectorAll('input, select, textarea');
+                        if (inputs.length > 0) {
+                            structure.forms.push({
+                                id: form.id || null,
+                                action: form.action || null,
+                                method: form.method || 'get',
+                                inputCount: inputs.length,
+                                hasSubmitButton: form.querySelector('button[type="submit"], input[type="submit"]') !== null,
+                                isSearchForm: form.querySelector('input[type="search"]') !== null ||
+                                             form.classList.contains('search') ||
+                                             form.id.includes('search')
+                            });
+                        }
+                    });
+
+                    // Identify interactive elements
+                    const interactiveSelectors = [
+                        'button',
+                        'a.button',
+                        '.btn',
+                        '[role="button"]',
+                        'input[type="button"]',
+                        'input[type="submit"]',
+                        'select',
+                        'details',
+                        '[aria-expanded]',
+                        '.accordion',
+                        '.tab',
+                        '.dropdown'
+                    ];
+
+                    interactiveSelectors.forEach(selector => {
+                        const elements = document.querySelectorAll(selector);
+                        elements.forEach(el => {
+                            if (el.getBoundingClientRect().height > 0 && window.getComputedStyle(el).display !== 'none') {
+                                structure.interactiveElements.push({
+                                    type: el.tagName.toLowerCase(),
+                                    text: el.innerText.trim() || el.value || el.getAttribute('aria-label') || '',
+                                    isVisible: true,
+                                    selector: selector
+                                });
+                            }
+                        });
+                    });
+
+                    return structure;
+                }
+
+                return analyzePageStructure();
+            """)
+
+            # Calculate relevance score based on query and content
+            relevance_score = await self._calculate_content_relevance(context, query, main_content)
+
+            # Combine all analysis
+            analysis = {
+                "metadata": metadata,
+                "main_content": main_content,
+                "page_structure": page_structure,
+                "relevance_score": relevance_score
+            }
+
+            return analysis
+
+        except Exception as e:
+            logger.error(f"Error analyzing page semantics: {str(e)}")
+            return {
+                "metadata": {},
+                "main_content": "Error extracting content",
+                "page_structure": {},
+                "relevance_score": 0.0
+            }
+
+    async def _identify_actionable_elements(self, context: BrowserContext, query: str) -> List[Dict]:
+        """
+        Identify actionable elements on the page that are relevant to the query.
+        Returns a list of dictionaries with information about actionable elements.
+        """
+        try:
+            # Get all potential interactive elements
+            elements_data = await context.execute_javascript(f"""
+                function identifyActionableElements(query) {{
+                    const queryTerms = query.toLowerCase().split(/\\s+/);
+                    const actionableElements = [];
+
+                    // Helper function to calculate relevance score
+                    function calculateRelevance(text, elementType) {{
+                        if (!text) return 0;
+                        text = text.toLowerCase();
+
+                        // Base score
+                        let score = 0;
+
+                        // Check for exact match
+                        if (text.includes(query.toLowerCase())) {{
+                            score += 10;
+                        }}
+
+                        // Check for term matches
+                        for (const term of queryTerms) {{
+                            if (term.length > 2 && text.includes(term)) {{
+                                score += 3;
+                            }}
+                        }}
+
+                        // Boost score for certain element types
+                        if (elementType === 'button' || elementType === 'submit') {{
+                            score *= 1.5;
+                        }} else if (elementType === 'link') {{
+                            score *= 1.2;
+                        }}
+
+                        return score;
+                    }}
+
+                    // Process buttons
+                    document.querySelectorAll('button, input[type="button"], input[type="submit"], [role="button"], a.button, .btn').forEach(el => {{
+                        if (el.getBoundingClientRect().height > 0 && window.getComputedStyle(el).display !== 'none') {{
+                            const text = el.innerText.trim() || el.value || el.getAttribute('aria-label') || '';
+                            const relevance = calculateRelevance(text, 'button');
+
+                            if (relevance > 0) {{
+                                const rect = el.getBoundingClientRect();
+                                actionableElements.push({{
+                                    type: el.tagName.toLowerCase(),
+                                    subtype: el.type || '',
+                                    text: text,
+                                    selector: getUniqueSelector(el),
+                                    action_type: 'click',
+                                    relevance: relevance,
+                                    description: `Button: "${{text}}"`,
+                                    position: {{
+                                        x: rect.left + (rect.width / 2),
+                                        y: rect.top + (rect.height / 2)
+                                    }}
+                                }});
+                            }}
+                        }}
+                    }});
+
+                    // Process links
+                    document.querySelectorAll('a[href]').forEach(el => {{
+                        if (el.getBoundingClientRect().height > 0 && window.getComputedStyle(el).display !== 'none') {{
+                            const text = el.innerText.trim() || el.getAttribute('aria-label') || '';
+                            const href = el.href;
+                            const relevance = calculateRelevance(text, 'link');
+
+                            if (relevance > 0) {{
+                                const rect = el.getBoundingClientRect();
+                                actionableElements.push({{
+                                    type: 'link',
+                                    text: text,
+                                    href: href,
+                                    selector: getUniqueSelector(el),
+                                    action_type: 'click',
+                                    relevance: relevance,
+                                    description: `Link: "${{text}}" (href: ${{href}})`,
+                                    position: {{
+                                        x: rect.left + (rect.width / 2),
+                                        y: rect.top + (rect.height / 2)
+                                    }}
+                                }});
+                            }}
+                        }}
+                    }});
+
+                    // Process form inputs
+                    document.querySelectorAll('input[type="text"], input[type="search"], input:not([type]), textarea').forEach(el => {{
+                        if (el.getBoundingClientRect().height > 0 && window.getComputedStyle(el).display !== 'none') {{
+                            // Look for associated label
+                            let labelText = '';
+                            if (el.id) {{
+                                const label = document.querySelector(`label[for="${{el.id}}"]`);
+                                if (label) labelText = label.innerText.trim();
+                            }}
+
+                            // If no label, try placeholder or nearby text
+                            if (!labelText) {{
+                                labelText = el.placeholder || '';
+
+                                if (!labelText) {{
+                                    // Try to find nearby text that might be a label
+                                    const parent = el.parentElement;
+                                    if (parent) {{
+                                        const siblings = Array.from(parent.childNodes);
+                                        for (const sibling of siblings) {{
+                                            if (sibling.nodeType === Node.TEXT_NODE && sibling.textContent.trim()) {{
+                                                labelText = sibling.textContent.trim();
+                                                break;
+                                            }} else if (sibling.nodeType === Node.ELEMENT_NODE &&
+                                                      sibling !== el &&
+                                                      !sibling.querySelector('input') &&
+                                                      sibling.innerText.trim()) {{
+                                                labelText = sibling.innerText.trim();
+                                                break;
+                                            }}
+                                        }}
+                                    }}
+                                }}
+                            }}
+
+                            const relevance = calculateRelevance(labelText, 'input');
+
+                            if (relevance > 0) {{
+                                const rect = el.getBoundingClientRect();
+                                actionableElements.push({{
+                                    type: 'input',
+                                    subtype: el.type || 'text',
+                                    label: labelText,
+                                    selector: getUniqueSelector(el),
+                                    action_type: 'input_text',
+                                    input_value: query, // Default input value is the query
+                                    relevance: relevance,
+                                    description: `Input field: "${{labelText}}"`,
+                                    position: {{
+                                        x: rect.left + (rect.width / 2),
+                                        y: rect.top + (rect.height / 2)
+                                    }}
+                                }});
+                            }}
+                        }}
+                    }});
+
+                    // Process select dropdowns
+                    document.querySelectorAll('select').forEach(el => {{
+                        if (el.getBoundingClientRect().height > 0 && window.getComputedStyle(el).display !== 'none') {{
+                            // Look for associated label
+                            let labelText = '';
+                            if (el.id) {{
+                                const label = document.querySelector(`label[for="${{el.id}}"]`);
+                                if (label) labelText = label.innerText.trim();
+                            }}
+
+                            const options = Array.from(el.options).map(opt => opt.innerText.trim());
+                            const optionsText = options.join(' ');
+
+                            const relevance = calculateRelevance(labelText + ' ' + optionsText, 'select');
+
+                            if (relevance > 0) {{
+                                const rect = el.getBoundingClientRect();
+                                actionableElements.push({{
+                                    type: 'select',
+                                    label: labelText,
+                                    options: options,
+                                    selector: getUniqueSelector(el),
+                                    action_type: 'click',
+                                    relevance: relevance,
+                                    description: `Dropdown: "${{labelText}}" with ${{options.length}} options`,
+                                    position: {{
+                                        x: rect.left + (rect.width / 2),
+                                        y: rect.top + (rect.height / 2)
+                                    }}
+                                }});
+                            }}
+                        }}
+                    }});
+
+                    // Helper function to get a unique selector for an element
+                    function getUniqueSelector(el) {{
+                        // Try ID first
+                        if (el.id) return `#${{el.id}}`;
+
+                        // Try unique classes
+                        if (el.classList.length > 0) {{
+                            const classSelector = Array.from(el.classList).map(c => `.${c}`).join('');
+                            if (document.querySelectorAll(classSelector).length === 1) return classSelector;
+                        }}
+
+                        // Try with tag name and attributes
+                        const tag = el.tagName.toLowerCase();
+                        if (el.getAttribute('name')) {{
+                            const nameSelector = `${tag}[name="${el.getAttribute('name')}"]`;
+                            if (document.querySelectorAll(nameSelector).length === 1) return nameSelector;
+                        }}
+
+                        if (el.getAttribute('placeholder')) {{
+                            const placeholderSelector = `${tag}[placeholder="${el.getAttribute('placeholder')}"]`;
+                            if (document.querySelectorAll(placeholderSelector).length === 1) return placeholderSelector;
+                        }}
+
+                        // Fallback to a more complex selector with nth-child
+                        let selector = tag;
+                        let parent = el.parentElement;
+                        let maxDepth = 3; // Limit depth to avoid overly complex selectors
+
+                        while (parent && maxDepth > 0) {{
+                            const children = Array.from(parent.children);
+                            const index = children.indexOf(el) + 1;
+                            selector = `${parent.tagName.toLowerCase()} > ${selector}:nth-child(${index})`;
+
+                            if (parent.id) {{
+                                selector = `#${parent.id} > ${selector}`;
+                                break;
+                            }}
+
+                            el = parent;
+                            parent = el.parentElement;
+                            maxDepth--;
+                        }}
+
+                        return selector;
+                    }}
+
+                    // Sort by relevance
+                    actionableElements.sort((a, b) => b.relevance - a.relevance);
+
+                    return actionableElements;
+                }}
+
+                return identifyActionableElements("{query}");
+            """)
+
+            # Filter to only include elements with sufficient relevance
+            relevant_elements = [el for el in elements_data if el.get('relevance', 0) > 2]
+
+            return relevant_elements[:5]  # Return top 5 most relevant elements
+
+        except Exception as e:
+            logger.error(f"Error identifying actionable elements: {str(e)}")
+            return []
+
+    async def _find_relevant_links(self, context: BrowserContext, query: str) -> List[Dict]:
+        """
+        Find links on the page that are relevant to the query.
+        Returns a list of dictionaries with information about relevant links.
+        """
+        try:
+            # Get all links and calculate relevance
+            links_data = await context.execute_javascript(f"""
+                function findRelevantLinks(query) {{
+                    const queryTerms = query.toLowerCase().split(/\\s+/);
+                    const links = [];
+
+                    // Helper function to calculate relevance score
+                    function calculateRelevance(text, url) {{
+                        if (!text && !url) return 0;
+
+                        let score = 0;
+                        const lowerText = (text || '').toLowerCase();
+                        const lowerUrl = (url || '').toLowerCase();
+
+                        // Check for exact matches in text
+                        if (lowerText.includes(query.toLowerCase())) {{
+                            score += 10;
+                        }}
+
+                        // Check for exact matches in URL
+                        if (lowerUrl.includes(query.toLowerCase())) {{
+                            score += 5;
+                        }}
+
+                        // Check for term matches in text
+                        for (const term of queryTerms) {{
+                            if (term.length > 2) {{
+                                if (lowerText.includes(term)) {{
+                                    score += 3;
+                                }}
+
+                                if (lowerUrl.includes(term)) {{
+                                    score += 2;
+                                }}
+                            }}
+                        }}
+
+                        // Boost score for links with certain characteristics
+                        if (lowerText.includes('more') || lowerText.includes('details') || lowerText.includes('view')) {{
+                            score += 2;
+                        }}
+
+                        if (lowerUrl.includes('detail') || lowerUrl.includes('view') || lowerUrl.includes('page')) {{
+                            score += 1;
+                        }}
+
+                        return score;
+                    }}
+
+                    // Process all links
+                    document.querySelectorAll('a[href]').forEach(el => {{
+                        if (el.getBoundingClientRect().height > 0 && window.getComputedStyle(el).display !== 'none') {{
+                            const text = el.innerText.trim();
+                            const href = el.href;
+
+                            // Skip non-http links, anchors, etc.
+                            if (!href.startsWith('http')) return;
+
+                            // Skip likely navigation links
+                            if (el.closest('nav') || el.closest('header') || el.closest('footer')) return;
+
+                            const relevance = calculateRelevance(text, href);
+
+                            if (relevance > 0) {{
+                                links.push({{
+                                    text: text,
+                                    url: href,
+                                    relevance: relevance,
+                                    hasImage: el.querySelector('img') !== null
+                                }});
+                            }}
+                        }}
+                    }});
+
+                    // Sort by relevance
+                    links.sort((a, b) => b.relevance - a.relevance);
+
+                    return links;
+                }}
+
+                return findRelevantLinks("{query}");
+            """)
+
+            # Filter to only include links with sufficient relevance
+            relevant_links = [link for link in links_data if link.get('relevance', 0) > 2]
+
+            return relevant_links[:10]  # Return top 10 most relevant links
+
+        except Exception as e:
+            logger.error(f"Error finding relevant links: {str(e)}")
+            return []
+
+    async def _interact_with_element(self, context: BrowserContext, selector: str, action_type: str, input_value: Optional[str] = None) -> str:
+        """
+        Interact with an element on the page.
+        Returns a string describing the result of the interaction.
+        """
+        try:
+            if action_type == "click":
+                # First check if element exists
+                element_exists = await context.execute_javascript(f"""
+                    (function() {{
+                        const element = document.querySelector('{selector}');
+                        return !!element && element.getBoundingClientRect().height > 0;
+                    }})();
+                """)
+
+                if not element_exists:
+                    return "Element not found or not visible"
+
+                # Perform the click
+                await context.execute_javascript(f"""
+                    (function() {{
+                        const element = document.querySelector('{selector}');
+                        if (element) {{
+                            // Scroll element into view
+                            element.scrollIntoView({{behavior: 'smooth', block: 'center'}});
+
+                            // Highlight the element briefly
+                            const originalBackground = element.style.backgroundColor;
+                            const originalTransition = element.style.transition;
+                            element.style.transition = 'background-color 0.3s';
+                            element.style.backgroundColor = 'rgba(255, 255, 0, 0.3)';
+
+                            // Click after a short delay
+                            setTimeout(() => {{
+                                element.click();
+
+                                // Restore original styling
+                                setTimeout(() => {{
+                                    element.style.backgroundColor = originalBackground;
+                                    element.style.transition = originalTransition;
+                                }}, 300);
+                            }}, 300);
+                        }}
+                    }})();
+                """)
+
+                # Wait for any navigation or content changes
+                await asyncio.sleep(2)
+
+                return "Clicked element successfully"
+
+            elif action_type == "input_text":
+                if not input_value:
+                    return "No input value provided"
+
+                # First check if element exists
+                element_exists = await context.execute_javascript(f"""
+                    (function() {{
+                        const element = document.querySelector('{selector}');
+                        return !!element && (element.tagName === 'INPUT' || element.tagName === 'TEXTAREA');
+                    }})();
+                """)
+
+                if not element_exists:
+                    return "Input element not found"
+
+                # Perform the input
+                await context.execute_javascript(f"""
+                    (function() {{
+                        const element = document.querySelector('{selector}');
+                        if (element) {{
+                            // Scroll element into view
+                            element.scrollIntoView({{behavior: 'smooth', block: 'center'}});
+
+                            // Focus and clear the input
+                            element.focus();
+                            element.value = '';
+
+                            // Trigger input event
+                            const inputEvent = new Event('input', {{ bubbles: true }});
+                            element.dispatchEvent(inputEvent);
+
+                            // Type the text with a slight delay between characters
+                            const text = `{input_value}`;
+                            let i = 0;
+
+                            function typeNextChar() {{
+                                if (i < text.length) {{
+                                    element.value += text.charAt(i);
+                                    element.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                                    i++;
+                                    setTimeout(typeNextChar, 30);
+                                }}
+                            }}
+
+                            typeNextChar();
+                        }}
+                    }})();
+                """)
+
+                # Wait for any suggestions or dynamic content
+                await asyncio.sleep(1)
+
+                return f"Entered text: '{input_value}'"
+
+            else:
+                return f"Unsupported action type: {action_type}"
+
+        except Exception as e:
+            logger.error(f"Error interacting with element: {str(e)}")
+            return f"Error: {str(e)}"
+
+    async def _calculate_content_relevance(self, context: BrowserContext, query: str, content: str) -> float:
+        """
+        Calculate the relevance of page content to the query.
+        Returns a float between 0.0 and 1.0 representing relevance score.
+        """
+        try:
+            # Simple relevance calculation based on term frequency
+            query_terms = query.lower().split()
+            content_lower = content.lower()
+
+            # Check for exact match
+            if query.lower() in content_lower:
+                return 0.9  # High relevance for exact match
+
+            # Calculate term frequency
+            term_matches = 0
+            total_terms = len(query_terms)
+
+            for term in query_terms:
+                if len(term) > 2 and term in content_lower:  # Only count terms with length > 2
+                    term_matches += 1
+
+            if total_terms > 0:
+                term_ratio = term_matches / total_terms
+            else:
+                term_ratio = 0
+
+            # Calculate density of matches
+            content_words = len(content_lower.split())
+            if content_words > 0:
+                density = term_matches / content_words
+            else:
+                density = 0
+
+            # Combine metrics with weights
+            relevance = (term_ratio * 0.7) + (min(density * 100, 1.0) * 0.3)
+
+            # Ensure score is between 0 and 1
+            return min(max(relevance, 0.0), 1.0)
+
+        except Exception as e:
+            logger.error(f"Error calculating content relevance: {str(e)}")
+            return 0.0
 
     async def _extract_page_metadata(self, context: BrowserContext) -> Dict:
         """Extract metadata from the page."""
